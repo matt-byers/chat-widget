@@ -1,0 +1,127 @@
+/* Chat.scss */
+.wrapper {
+  position: absolute;
+  bottom: 50px;
+  right: 50px;
+  z-index: 1;
+}
+
+.container {
+  box-shadow: rgba(0, 0, 0, 0.16) 0px 5px 40px;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to top left, #f2f2fd, white); // Gradient from white to light purple
+  height: 500px;
+  width: 350px;
+}
+
+.headerContainer {
+  display: flex;
+  padding: 16px;
+}
+
+.chatWindow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto; // Allows for scrolling when necessary
+}
+
+.message {
+  font-size: 14px;
+  max-width: 60%;
+  padding: 17px 20px;
+  margin: 5px 0;
+  border-radius: 10px;
+  word-wrap: break-word;
+  // background-color: #f2f2f2;
+
+  &.user {
+    background-color: black;
+    color: white;
+    align-self: flex-end;
+  }
+
+  &.assistant {
+    background: linear-gradient(to top left, rgba(211, 211, 211, 0.2), rgba(240, 240, 240, 0.5));
+    color: black;
+    align-self: flex-start;
+  }
+}
+
+// 2. when i am scrolled up to see previous messages and a user sends a message, it automatically scrolls to the bottom
+// 3. when the user scrolls more than 60px from the bottom of the list of messages, a button appears which the user can click to take them to the bottom
+
+.inputContainer {
+  display: flex;
+  flex-shrink: 0;
+  padding: 16px;
+  border-top: none;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  flex: 1;
+  padding: 8px;
+  border-radius: 24px;
+  background-color: #ffffff;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 1px 2px;
+  transition: box-shadow 0.2s;
+
+  // Triggered when textarea element is focused
+  &:focus-within {
+    box-shadow: 0 0 0 2px black, rgba(0, 0, 0, 0.1) 0 0 5px 0; // 2px black border expands outwards
+    transition: box-shadow 0.5s ease; // Ensure the transition applies  
+  }
+}
+
+.input {
+  flex: 1;
+  padding: 0 14px;
+  margin: 6px 0;
+  font-size: 14px;
+  border: none;
+  outline: none;
+  line-height: 20px;
+  max-height: 200px;
+  overflow: hidden;
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  resize: none;
+  background-color: transparent;
+  overflow-wrap: break-word;
+  width: 100%;
+  white-space: pre-wrap;
+}
+
+.button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: black;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.iconWrapper {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svgIcon {
+  width: 100%;
+  height: 100%;
+  color: white; // Update to match the example color
+}
