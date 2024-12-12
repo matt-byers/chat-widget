@@ -16,3 +16,7 @@ Thumbs.db
 # Build directories
 /dist
 /build
+
+# Readme
+
+README.md

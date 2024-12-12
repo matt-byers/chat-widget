@@ -28,17 +28,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   header: {
     padding: '20px',
-    backgroundColor: '#4e4e4e',
+    backgroundColor: 'white',
     textAlign: 'left',
   },
   main: {
     flex: 1,
-    backgroundColor: '#5e5e5e',
+    backgroundColor: 'white',
     padding: '20px',
   },
   footer: {
     padding: '20px',
-    backgroundColor: '#4e4e4e',
+    backgroundColor: 'white',
     textAlign: 'left',
   },
 };
