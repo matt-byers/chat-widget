@@ -2,89 +2,92 @@ import React, { useState, useRef, useEffect } from 'react';
 import './Chat.scss';
 import chatConfig from './chatConfig.json';
 
-// TODO:
-// 1. (Core functionality (search and refinement - core value proposition))
-// CALL SEARCH ENDPOINT.
-// Call Get item details endpoint. This is then fed into the conversation so the AI can update the search query based on feedback.
-// Persist widget state and UI refresh and across page routes
-// Set up moderation endpoint check for each user message (this is free from openAI).
+interface ChatProps {
+  onSearchUpdate: (data: Record<string, any>) => void;
+  onIntentionUpdate: (data: Record<string, any>) => void;
+}
 
-// 2. Frontend (Basic working funcitonality - do before initial deployment for working demo)
-// Open widget with custom placeholder message
-// Create minimise method and create a minimised UI mode
-// Fade messages out at top of chat window, and at bottom when scrolling
-// Mobile web view - handle not exceeding width of page, shorter conversation height based on height of page
-
-// 3. Deploy working MVP
-// TBC
-
-// ^ At this point, I should have a working MVP installable either by script tag or NPM package,
-
-// --------------- POST INITIAL DEPLOYMENT OF MVP
-
-// 3. UI & UX (Do after initial deployment)
-// Handle not exceeding vertical height of page
-// Disable submit button until response starts coming through.
-// I need to figure out how to handle multiple messages being sent - maybe i wait and check if 
-// the user is still typing, then send the messages array? open ai should respond to all as it has a history
-
-
-const Chat: React.FC = () => {
+const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
   const [messages, setMessages] = useState<
     { role: 'user' | 'assistant' | 'system'; content: string }[]
   >([]);
   const [input, setInput] = useState('');
-  const [structuredData, setStructuredData] = useState<Record<string, any>>({});
+  const [searchData, setSearchData] = useState<Record<string, any>>({});
+  const [customerIntention, setCustomerIntention] = useState<Record<string, any>>({});
   const [isStreaming, setIsStreaming] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isTransparent, setIsTransparent] = useState(true);
-  const controllerRef = useRef<AbortController | null>(null);
+  const [isMinimised, setIsMinimised] = useState(true);
 
+  const controllerRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null); // textarea ref to adjust its height
   const chatWindowRef = useRef<HTMLDivElement>(null); // chatwindow ref to handle scroll on new message
 
-  // Check if the system message exists and is valid
+  // On component mount, set the system message with chatConfig data
   useEffect(() => {
-    // Destructure necessary fields from chatConfig
     const { businessContext, userContext, instructions } = chatConfig;
 
-    // Check if required data points are present
     if (!businessContext || !userContext || !instructions) {
       throw new Error('Missing required fields in chatConfig: businessContext, userContext, or instructions');
     }
 
-    // Construct the system message
     const systemMessage = `You are an assistant helping to extract search information for a customer. ` +
       `These are your instructions: ${instructions}. ` +
       `This is the context of the business you are assisting: ${businessContext}. ` +
-      `This is the context of how users are interacting with you: ${userContext})`;
+      `This is the context of how users are interacting with you: ${userContext})` +
+      `If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content,ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.`;
 
-    // Set the system message as the first message in the state
     setMessages([{ role: 'system', content: systemMessage }]);
-  }, []); // Run only once on component mount
-
+  }, []);
 
   // Handle message send and stream response on message array updated
   useEffect(() => {
-    // Check if there are new user messages to process
+    console.log('In messages useEffect');
+    // Only proceed if the last message is from the user
     if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return;
 
-    // TODO: See if theres another way to handle this, doesn't need to appear right away
-    // Add bot's message placeholder. Won't be added to state until api call is made
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
     const handleMessage = async () => {
-      setIsStreaming(true);
-
-      controllerRef.current = new AbortController();
+      console.log('Starting handleMessage');
 
       try {
+        const lastMessage = messages[messages.length - 1].content;
+        console.log('Checking moderation for:', lastMessage);
+
+        // Check moderation before proceeding
+        const moderationResponse = await fetch('http://localhost:5001/api/moderate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: lastMessage }),
+        });
+
+        if (!moderationResponse.ok) {
+          throw new Error('Moderation request failed');
+        }
+
+        const moderationResult = await moderationResponse.json();
+        console.log('Moderation result:', moderationResult);
+
+        if (moderationResult.flagged) {
+          console.log('Content flagged by moderation');
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: "I can't help with that."
+          }]);
+          return;
+        }
+
+        console.log('Content passed moderation, proceeding with chat');
+        // Add bot's message placeholder
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+        setIsStreaming(true);
+        controllerRef.current = new AbortController();
+
         const response = await fetch('http://localhost:5001/api/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ messages }), // Use the updated messages array
+          body: JSON.stringify({ messages }),
           signal: controllerRef.current.signal,
         });
 
@@ -104,7 +107,6 @@ const Chat: React.FC = () => {
           if (chunkValue) {
             botMessage += chunkValue;
 
-            // Update the last message (placeholder bot's message) with the new chunk
             setMessages(prev => {
               const updated = [...prev];
               updated[updated.length - 1] = { role: 'assistant', content: botMessage };
@@ -113,75 +115,115 @@ const Chat: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in handleMessage:', error);
         setMessages(prev => {
           const updated = [...prev];
           updated[updated.length - 1] = { role: 'assistant', content: 'Sorry, something went wrong.' };
           return updated;
         });
       } finally {
-        setIsStreaming(false); // Reset streaming status
+        console.log('Finishing handleMessage');
+        setIsStreaming(false);
         controllerRef.current = null;
       }
     };
 
-    handleMessage(); // Call handleMessage when there is a new user message
-  }, [messages]); // Depend on messages array
+    handleMessage();
+  }, [messages]);
 
-  const updateStructuredData = (newData: { [key: string]: any }) => {
-    setStructuredData(prevState => {
-      const updatedData = { ...prevState }; // Create a copy of the current state
+  useEffect(() => {
+    if (Object.keys(searchData).length > 0) {
+      onSearchUpdate(searchData);
+    }
+  }, [searchData]);
 
+  useEffect(() => {
+    if (Object.keys(customerIntention).length > 0) {
+      onIntentionUpdate(customerIntention);
+    }
+  }, [customerIntention]);
+
+  const updateSearchData = (newData: Record<string, any>) => {
+    console.log('Updating search data with:', newData);
+    setSearchData(prevState => {
+      const updatedData = { ...prevState };
+  
       for (const key in newData) {
-        if (newData[key]) {
-          updatedData[key] = newData[key]; // Update the value
+        if (newData[key] !== undefined && newData[key] !== null) {
+          updatedData[key] = newData[key];
         }
       }
-
-      return updatedData; // Return the updated state
+  
+      console.log('Final search data:', updatedData);
+      return updatedData;
+    });
+  };
+  
+  const updateCustomerIntention = (newData: Record<string, any>) => {
+    console.log('Updating customer intention with:', newData);
+    setCustomerIntention(prevState => {
+      const updatedData = { ...prevState };
+  
+      for (const key in newData) {
+        if (newData[key] !== undefined && newData[key] !== null) {
+          updatedData[key] = newData[key];
+        }
+      }
+  
+      console.log('Final customer intention:', updatedData);
+      return updatedData;
     });
   };
 
-  const handleDataCapture = async (currentInput: String) => {
-    if (!input.trim() || isExtracting) return;
-
-    controllerRef.current = new AbortController();
-
-    setIsExtracting(true);
-
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const currentInput = input;
+  
+    setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
+    setInput('');
+  
     try {
-      const response = await fetch('http://localhost:5001/api/structured-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content: currentInput, structuredData: chatConfig.structuredData }),
-        signal: controllerRef.current.signal,
-      });
-
-      if (!response.ok) {
+      setIsExtracting(true);
+      controllerRef.current = new AbortController();
+  
+      const [searchResponse, intentionResponse] = await Promise.all([
+        fetch('http://localhost:5001/api/search-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: currentInput,
+            searchData: chatConfig.searchData
+          }),
+          signal: controllerRef.current.signal,
+        }),
+        fetch('http://localhost:5001/api/customer-intention', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: currentInput,
+            customerIntention: chatConfig.customerIntention
+          }),
+          signal: controllerRef.current.signal,
+        })
+      ]);
+  
+      if (!searchResponse.ok || !intentionResponse.ok) {
         throw new Error('Network response was not ok');
       }
-
-      const data = await response.json();
-      updateStructuredData(data);
+  
+      const [searchData, customerIntentionData] = await Promise.all([
+        searchResponse.json(),
+        intentionResponse.json()
+      ]);
+  
+      updateSearchData(searchData);
+      updateCustomerIntention(customerIntentionData);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsExtracting(false);
       controllerRef.current = null;
     }
-  };
-
-  const handleSend = async () => {
-    if (!input.trim()) return; // Prevent sending empty messages
-    const currentInput = input;
-
-    // Update messages state with user message and clear input
-    setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
-    setInput('');
-
-    handleDataCapture(currentInput); // You can pass currentInput if needed
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -190,30 +232,32 @@ const Chat: React.FC = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Prevents adding a new line
-      handleSend(); // Call your send function
+      e.preventDefault();
+      handleSend();
     }
   };
 
-  const adjustHeight = () => {
-    if (textareaRef.current) {
-      // Reset the height to auto to measure scrollHeight correctly
-      textareaRef.current.style.height = 'auto';
-      // Set the height to scrollHeight to make all text visible
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  };
-
+  // Adjust the height of the textarea to fit the content
   useEffect(() => {
-    adjustHeight(); // Adjust height whenever the input changes
+    const adjustHeight = () => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      }
+    };
+    adjustHeight();
   }, [input]);
 
+  // Scroll to the bottom of the chat window when a new message is sent
   useEffect(() => {
-    // Scroll to the bottom of the chat window when a new message is sent
     if (chatWindowRef.current) {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight; // Scroll to the bottom
     }
-  }, [messages]); // Depend on messages array
+  }, [messages]);
+
+  const handleMinimise = () => {
+    setIsMinimised(prev => !prev);
+  };
 
   return (
     <div className={`wrapper ${isTransparent ? 'transparent' : ''}`}>
@@ -225,14 +269,14 @@ const Chat: React.FC = () => {
           <div className="headerContainer" role="banner" aria-label="Chat header">
             <button
               aria-label="Minimise chat"
-              onClick={handleSend}
+              onClick={handleMinimise} // Correct handler
               className="button grey square"
               type="button"
             >
               <i className="iconWrapper">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="svgIcon" // Changed to className
+                  className="svgIcon"
                   viewBox="0 0 16 16"
                 >
                   <path
@@ -254,7 +298,7 @@ const Chat: React.FC = () => {
           aria-label="Chat messages" // Provide context for screen readers
         >
           {messages.length === 1 && messages[0].role === 'system' && (
-            <div className="welcomeMessage">
+            <div className="openMessage">
               {chatConfig.openMessage}
             </div>
           )}
@@ -282,24 +326,24 @@ const Chat: React.FC = () => {
               value={input}
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
-              className="input" // Changed to className
-              placeholder="Tell us what you're looking for..."
+              className="input"
+              placeholder={chatConfig.chatPlaceHolder}
               disabled={isStreaming}
               rows={1}
-              aria-label="Message input" // Label for the textarea
-              required // Indicate that the input is required
+              aria-label="Message input"
+              required
             />
             <button
-              aria-label="Send a message" // Clear label for screen readers
+              aria-label="Send a message"
               onClick={handleSend}
-              className="button" // Changed to className
+              className="button"
               disabled={isStreaming}
-              type="button" // Button type
+              type="button"
             >
-              <i className="iconWrapper"> {/* Changed to className */}
+              <i className="iconWrapper">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="svgIcon" // Changed to className
+                  className="svgIcon"
                   viewBox="0 0 16 16"
                 >
                   <path

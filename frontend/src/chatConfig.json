@@ -3,9 +3,10 @@
   "instructions": "Your purpose is to help the customer choose a location to travel to. It has to be a safe location.",
   "businessContext": "We are a booking company called airbnb, offering unique and high quality places to stay all over the world. Places are mostly listed by everyday people renting out their house for holidays.",
   "userContext": "You are placed on the home page of a travel website, which has a regular location, dates, and number of guests data capture.",
-  "openMessage": "Need help? Tell us what you think of these results and we can help you find what you want.",
+  "openMessage": "Need help? Tell us what you think of these results and we will help you find what you want!",
+  "chatPlaceHolder": "Tell us what you're looking for...",
   "extractData": "Infer and return any data points that relate to the customer's travel ambitions. Keep them related to the charactersitics of the location or type, style, or vibe of travel they are looking for.",
-  "structuredData": {
+  "searchData": {
     "firstName": {
       "type": "string",
       "description": "The customer's first name."
@@ -29,6 +30,40 @@
     "budget": {
       "type": "string",
       "description": "Roughly how much the customer wants to spend."
+    }
+  },
+  "customerIntention": {
+    "objective": {
+      "type": "string",
+      "description": "The primary goal the customer aims to achieve.",
+      "enum": ["discover", "transact", "compare", "resolve", "customize"]
+    },
+    "budget": {
+      "type": "number",
+      "description": "The maximum amount the customer is willing to spend."
+    },
+    "purchase_urgency": {
+      "type": "string",
+      "description": "How urgently the customer needs to achieve their objective.",
+      "enum": ["immediate", "within_days", "within_weeks", "within_months"]
+    },
+    "urgency_level": {
+      "type": "number",
+      "description": "How urgently the customer needs to achieve their objective. (1: low, 2: medium, 3: high)",
+      "enum": [1, 2, 3]
+    },
+    "pain_points": {
+      "type": "array",
+      "description": "The challenges or problems the customer is trying to solve.",
+      "items": {
+        "type": "string",
+        "description": "A specific pain point or challenge."
+      }
+    },
+    "satisfaction_level": {
+      "type": "number",
+      "description": "Current satisfaction level of the customer with existing products or services.",
+      "enum": [1, 3, 5]
     }
   }
 }

@@ -52,7 +52,15 @@
   flex-direction: column;
   align-items: flex-end; /* Align messages to the bottom */
   overflow-y: auto; /* Allow scrolling if messages overflow */
-  padding: 16px;
+  padding: 16px 16px 0 16px;
+}
+
+.openMessage {
+  padding: 8px;
+  font-style: italic;
+  font-size: 14px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .message {
@@ -60,7 +68,7 @@
   max-width: 60%;
   padding: 17px 20px;
   margin: 5px 0;
-  border-radius: 10px;
+  border-radius: 20px;
   word-wrap: break-word;
 
   &.user {
@@ -75,15 +83,34 @@
 
   &.assistant {
     background: linear-gradient(to top left, rgba(211, 211, 211, 0.2), rgba(240, 240, 240, 0.5));
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     color: black;
     align-self: flex-start;
 
     &.transparent {
-      background: white;
       box-shadow: rgba(35, 47, 53, 0.09) 0px 0px 8px 0px;
+      border: 1.5px solid transparent;
+      background-image: linear-gradient(rgb(245, 245, 245), rgb(245, 245, 245)), linear-gradient(90deg, rgb(254, 226, 212) 0%, rgb(245, 200, 214) 50%, rgb(219, 189, 219) 100%);
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
     }
   }
 }
+
+// Blur UI effect
+// .elevation-overlay {
+//   -webkit-backdrop-filter: blur(12px);
+//   backdrop-filter: blur(12px);
+//   box-shadow: 0 16px 40px -4px #0d162f14, 0 4px 8px #0d162f0d;
+// }
+
+// .p-xxs {
+//   padding: 4px;
+// }
+// .bg-background-brand\/5 {
+//   background-color: #685fff0d;
+// }
 
 .inputContainer {
   display: flex;
@@ -100,7 +127,7 @@
   padding: 8px;
   border-radius: 24px;
   background-color: #ffffff;
-  box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 4px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 8px;
   transition: box-shadow 0.2s;
 
   // Triggered when textarea element is focused
