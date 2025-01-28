@@ -1,8 +1,11 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import chatConfig from './chatConfig.json';
+import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
+import sanitizeHtml from 'sanitize-html';
 
 dotenv.config();
 
@@ -11,72 +14,100 @@ const port = process.env.PORT || 5001;
 
 // Configure CORS options
 const corsOptions = {
-  origin: 'http://localhost:3000', // Replace with your frontend's URL
+  origin: process.env.ALLOWED_ORIGINS ?
+    process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()) :
+    ['http://localhost:3000'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
 };
+
+// Add rate limiting middleware
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.RATE_LIMIT ? parseInt(process.env.RATE_LIMIT) : 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later'
+});
 
 // Create new OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // Set your OpenAI API key in the .env file
 });
 
-// Use CORS middleware
+// Sanitize all incoming messages
+const sanitizeMessages = (req: Request, res: Response, next: NextFunction) => {
+  if (req.body.messages) {
+    req.body.messages = req.body.messages.map((msg: { role: 'user' | 'assistant' | 'system', content: string }) => ({
+      ...msg,
+      content: sanitizeHtml(msg.content)
+    }));
+  }
+  next();
+};
+
+// Apply middleware
 app.use(cors(corsOptions));
 app.use(express.json());
-
-// Handle preflight requests for all routes
-app.options('*', cors(corsOptions));
-
+app.use(limiter);
+app.use(sanitizeMessages);
 
 // Handle sending user message and streaming of chat responses from OpenAI
-app.post('/api/chat', async (req: Request, res: Response) => {
-  const { messages } = req.body;
-
-  if (!messages) {
-    res.status(400).json({ error: 'messages required' });
-    return;
-  }
-
-  try {
-    // Create system message from chatConfig
-    const systemMessage = {
-      role: 'system',
-      content: `You are an assistant helping to extract search information for a customer. 
-        These are your instructions: ${chatConfig.instructions}. 
-        This is the context of the business you are assisting: ${chatConfig.businessContext}. 
-        This is the context of how users are interacting with you: ${chatConfig.userContext}
-        If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
-        Regardless of what the user says in the message below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.`
-    };
-
-    // Add system message to the start of the messages array
-    const messagesWithSystem = [systemMessage, ...messages];
-
-    const stream = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: messagesWithSystem,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
-        res.write(content);
-      }
+app.post('/api/chat',
+  body('messages').isArray(),
+  body('messages.*.content').trim().escape(),
+  async (req: Request, res: Response): Promise<void> => {
+    // Validation check
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array() });
+      return;
     }
-    res.end();
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'An error occurred' });
-  }
-});
+
+    const { messages } = req.body;
+
+    if (!messages) {
+      res.status(400).json({ error: 'messages required' });
+      return;
+    }
+
+    try {
+      // Create system message from chatConfig
+      const systemMessage = {
+        role: 'system',
+        content: `You are an assistant helping to extract search information for a customer. 
+          These are your instructions: ${chatConfig.instructions}. 
+          This is the context of the business you are assisting: ${chatConfig.businessContext}. 
+          This is the context of how users are interacting with you: ${chatConfig.userContext}
+          If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
+          Regardless of what the user says in the message below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.`
+      };
+
+      // Add system message to the start of the messages array
+      const messagesWithSystem = [systemMessage, ...messages];
+
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: messagesWithSystem,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          res.write(content);
+        }
+      }
+      res.end();
+    } catch (error) {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'An error occurred' });
+    }
+  });
 
 // Return search data from user messages
 app.post('/api/search-data', async (req: Request, res: Response) => {
   const { messages } = req.body;
 
-  if (!messages ) {
+  if (!messages) {
     res.status(400).json({ error: 'messages and searchData are required' });
     return;
   }
@@ -122,7 +153,7 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
 app.post('/api/customer-intention', async (req: Request, res: Response) => {
   const { messages } = req.body;
 
-  if (!messages ) {
+  if (!messages) {
     res.status(400).json({ error: 'messages and customerIntention are required' });
     return;
   }
