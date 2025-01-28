@@ -1,94 +1,54 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chat.scss';
-import chatConfig from './chatConfig.json';
 
 interface ChatProps {
   onSearchUpdate: (data: Record<string, any>) => void;
   onIntentionUpdate: (data: Record<string, any>) => void;
 }
 
+interface OpenAIMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
-  const [messages, setMessages] = useState<
-    { role: 'user' | 'assistant' | 'system'; content: string }[]
-  >([]);
+  // Chat content
+  const [messages, setMessages] = useState<OpenAIMessage[]>([]);
   const [input, setInput] = useState('');
+
+  // Data states
   const [searchData, setSearchData] = useState<Record<string, any>>({});
   const [customerIntention, setCustomerIntention] = useState<Record<string, any>>({});
+
+  // UI states
   const [isStreaming, setIsStreaming] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isTransparent, setIsTransparent] = useState(true);
   const [isMinimised, setIsMinimised] = useState(true);
 
-  const controllerRef = useRef<AbortController | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null); // textarea ref to adjust its height
-  const chatWindowRef = useRef<HTMLDivElement>(null); // chatwindow ref to handle scroll on new message
+  // Refs
+  const chatControllerRef = useRef<AbortController | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
 
-  // On component mount, set the system message with chatConfig data
   useEffect(() => {
-    const { businessContext, userContext, instructions } = chatConfig;
-
-    if (!businessContext || !userContext || !instructions) {
-      throw new Error('Missing required fields in chatConfig: businessContext, userContext, or instructions');
-    }
-
-    const systemMessage = `You are an assistant helping to extract search information for a customer. ` +
-      `These are your instructions: ${instructions}. ` +
-      `This is the context of the business you are assisting: ${businessContext}. ` +
-      `This is the context of how users are interacting with you: ${userContext})` +
-      `If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content,ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.`;
-
-    setMessages([{ role: 'system', content: systemMessage }]);
-  }, []);
-
-  // Handle message send and stream response on message array updated
-  useEffect(() => {
-    console.log('In messages useEffect');
-    // Only proceed if the last message is from the user
-    if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return;
+    if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return; // Only process user messages
 
     const handleMessage = async () => {
-      console.log('Starting handleMessage');
+      setIsStreaming(true);
+      chatControllerRef.current = new AbortController();
+      const lastMessage = messages[messages.length - 1].content;
+
+      await moderateUserMessage(lastMessage);
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]); // Placeholder assistant message
+      processExtraction();
 
       try {
-        const lastMessage = messages[messages.length - 1].content;
-        console.log('Checking moderation for:', lastMessage);
-
-        // Check moderation before proceeding
-        const moderationResponse = await fetch('http://localhost:5001/api/moderate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: lastMessage }),
-        });
-
-        if (!moderationResponse.ok) {
-          throw new Error('Moderation request failed');
-        }
-
-        const moderationResult = await moderationResponse.json();
-        console.log('Moderation result:', moderationResult);
-
-        if (moderationResult.flagged) {
-          console.log('Content flagged by moderation');
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: "I can't help with that."
-          }]);
-          return;
-        }
-
-        console.log('Content passed moderation, proceeding with chat');
-        // Add bot's message placeholder
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-        setIsStreaming(true);
-        controllerRef.current = new AbortController();
-
         const response = await fetch('http://localhost:5001/api/chat', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages }),
-          signal: controllerRef.current.signal,
+          signal: chatControllerRef.current.signal,
         });
 
         if (!response.ok || !response.body) {
@@ -104,9 +64,9 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
           const { value, done: doneReading } = await reader.read();
           done = doneReading;
           const chunkValue = decoder.decode(value, { stream: true });
+
           if (chunkValue) {
             botMessage += chunkValue;
-
             setMessages(prev => {
               const updated = [...prev];
               updated[updated.length - 1] = { role: 'assistant', content: botMessage };
@@ -122,14 +82,75 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
           return updated;
         });
       } finally {
-        console.log('Finishing handleMessage');
         setIsStreaming(false);
-        controllerRef.current = null;
+        chatControllerRef.current = null;
       }
     };
 
     handleMessage();
   }, [messages]);
+
+  const moderateUserMessage = async (message: string) => {
+    console.log('Checking moderation for:', message);
+
+    const moderationResponse = await fetch('http://localhost:5001/api/moderate-user-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message }),
+    });
+
+    if (!moderationResponse.ok) {
+      throw new Error('Moderation request failed');
+    }
+
+    const moderationResult = await moderationResponse.json();
+    console.log('Moderation result:', moderationResult);
+
+    if (moderationResult.flagged) {
+      console.log('Content flagged by moderation');
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "I can't help with that."
+      }]);
+      return;
+    }
+
+    console.log('Content passed moderation, proceeding with chat');
+  };
+
+  const processExtraction = async () => {
+    if (messages.length === 0) return;
+
+    setIsExtracting(true);
+    try {
+      const [searchResponse, intentionResponse] = await Promise.all([
+        fetch('http://localhost:5001/api/search-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages }),
+        }),
+        fetch('http://localhost:5001/api/customer-intention', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages }),
+        })
+      ]);
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        updateSearchData(searchData);
+      }
+
+      if (intentionResponse.ok) {
+        const intentionData = await intentionResponse.json();
+        updateCustomerIntention(intentionData);
+      }
+    } catch (error) {
+      console.error('Error during extraction:', error);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   useEffect(() => {
     if (Object.keys(searchData).length > 0) {
@@ -147,29 +168,29 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
     console.log('Updating search data with:', newData);
     setSearchData(prevState => {
       const updatedData = { ...prevState };
-  
+
       for (const key in newData) {
         if (newData[key] !== undefined && newData[key] !== null) {
           updatedData[key] = newData[key];
         }
       }
-  
+
       console.log('Final search data:', updatedData);
       return updatedData;
     });
   };
-  
+
   const updateCustomerIntention = (newData: Record<string, any>) => {
     console.log('Updating customer intention with:', newData);
     setCustomerIntention(prevState => {
       const updatedData = { ...prevState };
-  
+
       for (const key in newData) {
         if (newData[key] !== undefined && newData[key] !== null) {
           updatedData[key] = newData[key];
         }
       }
-  
+
       console.log('Final customer intention:', updatedData);
       return updatedData;
     });
@@ -178,52 +199,10 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
   const handleSend = async () => {
     if (!input.trim()) return;
     const currentInput = input;
-  
+
     setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
     setInput('');
-  
-    try {
-      setIsExtracting(true);
-      controllerRef.current = new AbortController();
-  
-      const [searchResponse, intentionResponse] = await Promise.all([
-        fetch('http://localhost:5001/api/search-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: currentInput,
-            searchData: chatConfig.searchData
-          }),
-          signal: controllerRef.current.signal,
-        }),
-        fetch('http://localhost:5001/api/customer-intention', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: currentInput,
-            customerIntention: chatConfig.customerIntention
-          }),
-          signal: controllerRef.current.signal,
-        })
-      ]);
-  
-      if (!searchResponse.ok || !intentionResponse.ok) {
-        throw new Error('Network response was not ok');
-      }
-  
-      const [searchData, customerIntentionData] = await Promise.all([
-        searchResponse.json(),
-        intentionResponse.json()
-      ]);
-  
-      updateSearchData(searchData);
-      updateCustomerIntention(customerIntentionData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsExtracting(false);
-      controllerRef.current = null;
-    }
+    textareaRef.current?.focus();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -258,6 +237,15 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
   const handleMinimise = () => {
     setIsMinimised(prev => !prev);
   };
+
+  // Abort the chat stream when the component unmounts to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (chatControllerRef.current) {
+        chatControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <div className={`wrapper ${isTransparent ? 'transparent' : ''}`}>
@@ -297,9 +285,9 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
           aria-live="polite" // Announce updates to screen readers
           aria-label="Chat messages" // Provide context for screen readers
         >
-          {messages.length === 1 && messages[0].role === 'system' && (
+          {!messages.length && (
             <div className="openMessage">
-              {chatConfig.openMessage}
+              Need help? Tell us what you think of these results and we will help you find what you want!
             </div>
           )}
           {messages
@@ -318,6 +306,13 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
                 {msg.content}
               </div>
             ))}
+          {isStreaming && (
+            <div className="loadingSpinner">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+                <path fill="currentColor" d="M8 16a8 8 0 110-16 8 8 0 010 16zm0-1a7 7 0 100-14 7 7 0 000 14zM8 0a.75.75 0 01.75.75v6.5a.75.75 0 11-1.5 0V.75A.75.75 0 018 0z"></path>
+              </svg>
+            </div>
+          )}
         </div>
         <div className="inputContainer">
           <div className="inputWrapper">
@@ -325,10 +320,9 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
               ref={textareaRef}
               value={input}
               onChange={handleInputChange}
-              onKeyPress={handleKeyPress}
+              onKeyUp={handleKeyPress}
               className="input"
-              placeholder={chatConfig.chatPlaceHolder}
-              disabled={isStreaming}
+              placeholder={'Tell us what you\'re looking for...'}
               rows={1}
               aria-label="Message input"
               required

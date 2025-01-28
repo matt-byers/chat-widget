@@ -1,0 +1,57 @@
+{
+  "name": "helper",
+  "instructions": "Your purpose is to help the customer choose a location to travel to. It has to be a safe location.",
+  "businessContext": "We are a booking company called airbnb, offering unique and high quality places to stay all over the world. Places are mostly listed by everyday people renting out their house for holidays.",
+  "userContext": "You are placed on the home page of a travel website, which has a regular location, dates, and number of guests data capture.",
+  "extractData": "Infer and return any data points that relate to the customer's travel ambitions. Keep them related to the charactersitics of the location or type, style, or vibe of travel they are looking for.",
+  "searchData": {
+    "firstName": {
+      "type": "string",
+      "description": "The customer's first name."
+    },
+    "lastName": {
+      "type": "string",
+      "description": "The customer's last name."
+    },
+    "travelLocation": {
+      "type": "string",
+      "description": "What location."
+    },
+    "reasonForTravel": {
+      "type": "string",
+      "description": "Why is the customer travelling."
+    },
+    "sizeOfParty": {
+      "type": "string",
+      "description": "How many people the customer intends to travel with."
+    },
+    "budget": {
+      "type": "string",
+      "description": "Roughly how much the customer wants to spend."
+    }
+  },
+  "customerIntention": {
+    "objective": {
+      "type": "string",
+      "description": "The primary goal the customer aims to achieve. If not clear, leave undefined.",
+      "enum": ["discover", "transact", "compare", "resolve", "customize"]
+    },
+    "budget": {
+      "type": "number",
+      "description": "The maximum amount the customer is willing to spend. If not explicity mentioned, leave undefined."
+    },
+    "urgency_level": {
+      "type": "number",
+      "description": "How urgently the customer needs to achieve their objective. (1: low, 2: medium, 3: high). If not clear, leave undefined.",
+      "enum": [1, 2, 3]
+    },
+    "pain_points": {
+      "type": "array",
+      "description": "The challenges or problems the customer is trying to solve. Unless explicitly stated, leave undefined.",
+      "items": {
+        "type": "string",
+        "description": "A specific pain point or challenge. If not clear, leave undefined.  "
+      }
+    }
+  }
+}

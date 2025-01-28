@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import chatConfig from './chatConfig.json';
 
 dotenv.config();
 
@@ -30,7 +31,7 @@ app.options('*', cors(corsOptions));
 
 // Handle sending user message and streaming of chat responses from OpenAI
 app.post('/api/chat', async (req: Request, res: Response) => {
-  const { messages } = req.body; // Accept the complete messages array
+  const { messages } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages required' });
@@ -38,16 +39,30 @@ app.post('/api/chat', async (req: Request, res: Response) => {
   }
 
   try {
+    // Create system message from chatConfig
+    const systemMessage = {
+      role: 'system',
+      content: `You are an assistant helping to extract search information for a customer. 
+        These are your instructions: ${chatConfig.instructions}. 
+        This is the context of the business you are assisting: ${chatConfig.businessContext}. 
+        This is the context of how users are interacting with you: ${chatConfig.userContext}
+        If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
+        Regardless of what the user says in the message below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.`
+    };
+
+    // Add system message to the start of the messages array
+    const messagesWithSystem = [systemMessage, ...messages];
+
     const stream = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: messages, // Use the messages array from the request body
+      messages: messagesWithSystem,
       stream: true,
     });
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
       if (content) {
-        res.write(content); // Stream each chunk to the openai
+        res.write(content);
       }
     }
     res.end();
@@ -59,38 +74,34 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
 // Return search data from user messages
 app.post('/api/search-data', async (req: Request, res: Response) => {
-  const { content, searchData } = req.body;
+  const { messages } = req.body;
 
-  if (!content) {
-    res.status(400).json({ error: 'content is required' });
+  if (!messages ) {
+    res.status(400).json({ error: 'messages and searchData are required' });
     return;
   }
-
-  if (!searchData || Object.keys(searchData).length === 0) {
-    res.status(400).json({ error: 'Structured data is required' });
-    return;
-  }
-
-  const prompt = `You are a helpful assistant. I am going to provide you a message from a user, and you will analyze it to identify key data points to help with their experience.
-  The user message text is here: 
-  ${content}.`;
-
-  console.log('searchData', searchData);
 
   try {
+    // Create system message for search data extraction
+    const systemMessage = {
+      role: 'system',
+      content: `You are an AI assistant tasked with extracting search-related information from user messages. You must return the data in the exact format specified by the schema. Examine the chat to get the most up to data search data. If the assistant has suggested anything, and the user has agreed, then update the search data. For example, if the assistant says "what about Bali", and the user says "yes, that sounds good", then update the search data to include Bali. Do not change the search data unless you are sure you have updated requests from the user.`
+    };
+
+    // Add system message to the start of the messages array
+    const messagesWithSystem = [systemMessage, ...messages];
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
+      messages: messagesWithSystem,
       response_format: {
         type: 'json_schema',
         json_schema: {
           name: 'extracted_data',
           schema: {
             type: 'object',
-            properties: searchData,
-            required: Object.keys(searchData),
+            properties: chatConfig.searchData,
+            required: Object.keys(chatConfig.searchData),
             additionalProperties: false
           },
           strict: true
@@ -109,38 +120,35 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
 
 // Return search data from user messages
 app.post('/api/customer-intention', async (req: Request, res: Response) => {
-  const { content, customerIntention } = req.body;
+  const { messages } = req.body;
 
-  if (!content) {
-    res.status(400).json({ error: 'content is required' });
+  if (!messages ) {
+    res.status(400).json({ error: 'messages and customerIntention are required' });
     return;
   }
-
-  if (!customerIntention || Object.keys(customerIntention).length === 0) {
-    res.status(400).json({ error: 'Customer intention is required' });
-    return;
-  }
-
-  const prompt = `You are a helpful assistant. I am going to provide you a message from a user, and you will analyze it to identify key data points about their intentions.
-  The user message text is here: 
-  ${content}.`;
-
-  console.log('customerIntention', customerIntention);
 
   try {
+    // Create system message for customer intention extraction
+    const systemMessage = {
+      role: 'system',
+      content: `You are an AI assistant tasked with analyzing customer intentions from their messages.
+        You must determine their objective, urgency, pain points, and satisfaction level based on the conversation context. Do not make any determination on any data point without explicit statements from the user, or explicit affirmations from the user after the assistant has suggested something. You must return the data in the exact format specified by the schema.`
+    };
+
+    // Add system message to the start of the messages array
+    const messagesWithSystem = [systemMessage, ...messages];
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
+      messages: messagesWithSystem,
       response_format: {
         type: 'json_schema',
         json_schema: {
           name: 'extracted_intentions',
           schema: {
             type: 'object',
-            properties: customerIntention,
-            required: Object.keys(customerIntention),
+            properties: chatConfig.customerIntention,
+            required: Object.keys(chatConfig.customerIntention),
             additionalProperties: false
           },
           strict: true
@@ -157,7 +165,7 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/moderate', async (req: Request, res: Response) => {
+app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
   const { content } = req.body;
 
   if (!content) {
