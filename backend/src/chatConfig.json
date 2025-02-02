@@ -52,6 +52,30 @@
         "type": "string",
         "description": "A specific pain point or challenge. If not clear, leave undefined.  "
       }
+    },
+    "likes": {
+      "type": "array",
+      "description": "The customer's likes. If not clear, leave undefined.",
+      "items": {
+        "type": "string",
+        "description": "A specific like. If not clear, leave undefined."
+      }
+    },
+    "dislikes": {
+      "type": "array",
+      "description": "The customer's dislikes. If not clear, leave undefined.",
+      "items": {
+        "type": "string",
+        "description": "A specific dislike. If not clear, leave undefined."
+      }
+    },
+    "priorities": {
+      "type": "array",
+      "description": "The customer's preferences. If not clear, leave undefined.",
+      "items": {
+        "type": "string",
+        "description": "Single word description of a priority. E.g. price, location, style. If not clear, leave undefined."
+      }
     }
   }
 }
