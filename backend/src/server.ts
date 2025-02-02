@@ -5,8 +5,8 @@ import dotenv from 'dotenv';
 import chatConfig from './chatConfig.json';
 import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
-import { z } from 'zod';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { ContentGeneratorService } from './services/contentGenerator';
+import { CustomContentRequest } from './types/content';
 
 dotenv.config();
 
@@ -221,88 +221,20 @@ app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
   }
 });
 
-// The customer sends a request with the following information:
-interface CustomContentRequest {
-  itemInformation: Record<string, any>;
-  customerIntention: Record<string, any>;
-  name: string;
-  instructions: string;
-  minCharacters: number;
-  maxCharacters: number;
-  textExamples?: string[];
-}
-
-
-
 app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomContentRequest>, res: Response) => {
-  const { itemInformation, customerIntention, name, instructions, minCharacters, maxCharacters, textExamples = [] } = req.body;
+  const requestData = req.body;
 
-  if (!itemInformation || !customerIntention || !name || !instructions || !minCharacters || !maxCharacters) {
+  if (!requestData.itemInformation || !requestData.customerIntention || !requestData.name || 
+      !requestData.instructions || !requestData.minCharacters || !requestData.maxCharacters) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
 
-  const { objective, budget, ...filteredIntention } = customerIntention;
-
   try {
-    const systemMessage = `
-    You are an AI assistant specialised in generating personalised content for a particular item.
-
-    You will be provided with item information, customer intention, tone and style instructions, and text examples.
-
-    Rules and Constraints:
-    - Strictly obey the min: ${minCharacters} and max: ${maxCharacters} character limits.
-    - Do not copy the examples. Use them as a guide to understand the tone, style, and how to address the customer.
-
-    Generate custom content based on the above requirements.`
-
-    const userMessage = `
-    This is the item information:
-    ${JSON.stringify(itemInformation, null, 2)}
-    
-    This is the customer intention information: 
-    ${JSON.stringify(filteredIntention, null, 2)}
-
-    These are examples of text shown in a similar context:
-    ${textExamples.length > 0 ? ` 
-    ${textExamples.map(example => `- ${example}`).join('\n')}
-    ` : ''}
-
-    Understanding the item information and customer intention, generate custom text with the following instructions:
-
-    ${instructions}
-
-    Generate custom content based on the above requirements.`;
-
-    const PersonalizedContent = z.object({
-      generatedContent: z.string().describe(`Generated content, must be between ${minCharacters} and ${maxCharacters} characters long.`),
-      explanation: z.string().describe('In a few words, explain what customer attributes guided your generation. Clipped sentence. No more than 10 words.'),
-      metadata: z.object({
-        name: z.string().describe(`${name}`),
-        customerIntentionUsed: z.array(z.string()).describe('Only list keys from the customerIntention object that contained information explicitly used to generate the content')
-      })
-    });
-
-    const completion = await openai.beta.chat.completions.parse({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: userMessage }
-      ],
-      response_format: zodResponseFormat(PersonalizedContent, 'personalizedContent')
-    });
-
-    const result = completion.choices[0].message.parsed;
-    if (result) {
-      const updatedMetadata = {
-        ...result.metadata,
-        characterCount: result.generatedContent.length
-      };
-      res.json({ ...result, metadata: updatedMetadata });
-      console.log('result', { ...result, metadata: updatedMetadata });
-    } else {
-      throw new Error('Failed to parse completion result');
-    }
+    const contentGenerator = new ContentGeneratorService(openai);
+    const result = await contentGenerator.generateContent(requestData);
+    res.json(result);
+    console.log('result', result);
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'An error occurred while generating custom content' });
@@ -312,53 +244,3 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
-
-// curl -X POST http://localhost:5001/api/generate-custom-content \
-// -H "Content-Type: application/json" \
-// -d '{
-//   "itemInformation": {
-//     "name": "Lovely holiday home in palm beach",
-//     "description": "Lovely holiday home in palm beach, with a pool and a view of the ocean, lots of light, modern decor, 2 mins from the beach."
-//   },
-//   "customerIntention": {
-//     "objective": "discover",
-//     "budget": 400,
-//     "urgency_level": 2,
-//     "pain_points": ["limited space", "needs to match existing decor"],
-//     "likes": ["pool", "ocean view"],
-//     "dislikes": ["dark interiors"],
-//     "priorities": ["price", "location", "style"]
-//   },
-//   "name": "product_description",
-//   "instructions": "product description",
-//   "minCharacters": 10,
-//   "maxCharacters": 20,
-//   "textExamples": [
-//     "Luxurious beachfront home with stunning ocean views and modern amenities.",
-//     "Cozy mountain cabin with rustic charm and nearby hiking trails.",
-//     "Stylish urban loft featuring exposed brick and designer finishes."
-//   ]
-// }'
-
-// curl -X POST http://localhost:5001/api/generate-custom-content \
-// -H "Content-Type: application/json" \
-// -d "{ 
-//   \"itemInformation\": {
-//     \"name\": \"Lovely holiday home in palm beach\",
-//     \"description\": \"Lovely holiday home in palm beach, with a pool and a view of the ocean, lots of light, modern decor, 2 mins from the beach.\"
-//   },
-//   \"customerIntention\": {
-//     \"objective\": \"discover\",
-//     \"budget\": 400,
-//     \"urgency_level\": 2,
-//     \"pain_points\": [\"limited space\", \"needs to match existing decor\"],
-//     \"likes\": [\"modern decor\"],
-//     \"dislikes\": [\"dark interiors\"],
-//     \"priorities\": [\"price\", \"location\", \"style\"]
-//   },
-//   \"name\": \"product description\",
-//   \"instructions\": \"Speak in first person, and use the customer's name.\",
-//   \"minCharacters\": 50,
-//   \"maxCharacters\": 60
-// }"
