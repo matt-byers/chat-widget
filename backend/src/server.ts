@@ -226,46 +226,33 @@ interface CustomContentRequest {
   itemInformation: Record<string, any>;
   customerIntention: Record<string, any>;
   name: string;
-  textPurpose: string;
+  instructions: string;
   minCharacters: number;
   maxCharacters: number;
   textExamples?: string[];
 }
 
-// The response from the AI is the following:
-const PersonalizedContent = z.object({
-  generatedContent: z.string().describe('The generated content that matches the specified requirements'),
-  metadata: z.object({
-    name: z.string().describe('Name of the content widget. Provided in the request'),
-    customerIntentionUsed: z.array(z.string()).describe('The keys from the customer intention data that contained information explicitly used to generate the content')
-  })
-});
+
 
 app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomContentRequest>, res: Response) => {
-  const { itemInformation, customerIntention, name, textPurpose, minCharacters, maxCharacters, textExamples = [] } = req.body;
+  const { itemInformation, customerIntention, name, instructions, minCharacters, maxCharacters, textExamples = [] } = req.body;
 
-  if (!itemInformation || !customerIntention || !name || !textPurpose || !minCharacters || !maxCharacters) {
+  if (!itemInformation || !customerIntention || !name || !instructions || !minCharacters || !maxCharacters) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
 
+  const { objective, budget, ...filteredIntention } = customerIntention;
+
   try {
     const systemMessage = `
-    You are an AI assistant specialised in generating personalised content for ecommerce or marketplace businesses.
+    You are an AI assistant specialised in generating personalised content for a particular item.
 
-    You will be provided with a series of inputs which you will use to generate personalised text with a specific customer outcome in mind.
+    You will be provided with item information, customer intention, tone and style instructions, and text examples.
 
-    - Item information: Details on the item you are generating custom content for.
-    - Customer intention: Details on the customer's intention and preferences.
-    - Name: The unique name of the content widget you are generating.
-    - Examples: Examples of text you have generated in a similar context.
-    - Text purpose: The purpose of the text you are generating.
-    - Text examples: Examples of text you have generated in a similar context.
-
-    Instructions and rules:
-    - Strictly obey the min and max character limits.
-    - Do not copy the examples, but use them as a guide to understand the tone, style, and how to address the customer.
-    - Do not return keys from the customer intention data that were NOT explicitly relevant in the generation of the content.
+    Rules and Constraints:
+    - Strictly obey the min: ${minCharacters} and max: ${maxCharacters} character limits.
+    - Do not copy the examples. Use them as a guide to understand the tone, style, and how to address the customer.
 
     Generate custom content based on the above requirements.`
 
@@ -274,22 +261,27 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
     ${JSON.stringify(itemInformation, null, 2)}
     
     This is the customer intention information: 
-    ${JSON.stringify(customerIntention, null, 2)}
+    ${JSON.stringify(filteredIntention, null, 2)}
 
     These are examples of text shown in a similar context:
     ${textExamples.length > 0 ? ` 
     ${textExamples.map(example => `- ${example}`).join('\n')}
     ` : ''}
 
-    Understanding the item information and customer intention, generate custom text with the following purpose:
+    Understanding the item information and customer intention, generate custom text with the following instructions:
 
-    ${textPurpose}
-
-    Make sure to follow these rules when generating the content:
-      min characters: ${minCharacters}
-      max characters: ${maxCharacters}
+    ${instructions}
 
     Generate custom content based on the above requirements.`;
+
+    const PersonalizedContent = z.object({
+      generatedContent: z.string().describe(`Generated content, must be between ${minCharacters} and ${maxCharacters} characters long.`),
+      explanation: z.string().describe('In a few words, explain what customer attributes guided your generation. Clipped sentence. No more than 10 words.'),
+      metadata: z.object({
+        name: z.string().describe(`${name}`),
+        customerIntentionUsed: z.array(z.string()).describe('Only list keys from the customerIntention object that contained information explicitly used to generate the content')
+      })
+    });
 
     const completion = await openai.beta.chat.completions.parse({
       model: 'gpt-4o-mini',
@@ -338,8 +330,8 @@ app.listen(port, () => {
 //     "dislikes": ["dark interiors"],
 //     "priorities": ["price", "location", "style"]
 //   },
-//   "name": "product description",
-//   "textPurpose": "product description",
+//   "name": "product_description",
+//   "instructions": "product description",
 //   "minCharacters": 10,
 //   "maxCharacters": 20,
 //   "textExamples": [
@@ -351,22 +343,22 @@ app.listen(port, () => {
 
 // curl -X POST http://localhost:5001/api/generate-custom-content \
 // -H "Content-Type: application/json" \
-// -d '{
-//   "itemInformation": {
-//     "name": "Lovely holiday home in palm beach",
-//     "description": "Lovely holiday home in palm beach, with a pool and a view of the ocean, lots of light, modern decor, 2 mins from the beach."
+// -d "{ 
+//   \"itemInformation\": {
+//     \"name\": \"Lovely holiday home in palm beach\",
+//     \"description\": \"Lovely holiday home in palm beach, with a pool and a view of the ocean, lots of light, modern decor, 2 mins from the beach.\"
 //   },
-//   "customerIntention": {
-//     "objective": "discover",
-//     "budget": 400,
-//     "urgency_level": 2,
-//     "pain_points": ["limited space", "needs to match existing decor"],
-//     "likes": ["modern decor"],
-//     "dislikes": ["dark interiors"],
-//     "priorities": ["price", "location", "style"]
+//   \"customerIntention\": {
+//     \"objective\": \"discover\",
+//     \"budget\": 400,
+//     \"urgency_level\": 2,
+//     \"pain_points\": [\"limited space\", \"needs to match existing decor\"],
+//     \"likes\": [\"modern decor\"],
+//     \"dislikes\": [\"dark interiors\"],
+//     \"priorities\": [\"price\", \"location\", \"style\"]
 //   },
-//   "name": "product description",
-//   "textPurpose": "product description",
-//   "minCharacters": 50,
-//   "maxCharacters": 60
-// }'
+//   \"name\": \"product description\",
+//   \"instructions\": \"Speak in first person, and use the customer's name.\",
+//   \"minCharacters\": 50,
+//   \"maxCharacters\": 60
+// }"
