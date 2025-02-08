@@ -7,6 +7,8 @@ import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
 import { ContentGeneratorService } from './services/contentGenerator';
 import { CustomContentRequest } from './types/content';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { CustomerIntentionSchema, CustomerProspectSchema } from './schemas/customer';
 
 dotenv.config();
 
@@ -53,11 +55,7 @@ const sanitizeMessages = (req: Request, res: Response, next: NextFunction) => {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(limiter);
-
-// Apply middleware selectively
-app.use('/api/chat', sanitizeMessages);
-app.use('/api/search-data', sanitizeMessages);
-app.use('/api/customer-intention', sanitizeMessages);
+app.use('/api/*', sanitizeMessages);
 
 // Handle sending user message and streaming of chat responses from OpenAI
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
@@ -148,47 +146,33 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
   }
 });
 
-// Return search data from user messages
 app.post('/api/customer-intention', async (req: Request, res: Response) => {
   const { messages } = req.body;
 
   if (!messages) {
-    res.status(400).json({ error: 'messages and customerIntention are required' });
+    res.status(400).json({ error: 'messages are required' });
     return;
   }
 
   try {
-    // Create system message for customer intention extraction
     const systemMessage = {
       role: 'system',
       content: `You are an AI assistant tasked with analyzing customer intentions from their messages.
-        You must determine their objective, urgency, pain points, and satisfaction level based on the conversation context. Do not make any determination on any data point without explicit statements from the user, or explicit affirmations from the user after the assistant has suggested something. You must return the data in the exact format specified by the schema.`
+        You must determine their objective, urgency, pain points, and satisfaction level based on the conversation context.
+        Do not make any determination on any data point without explicit statements from the user, or explicit affirmations from the user after the assistant has suggested something.
+        You must return the data in the exact format specified by the schema.`
     };
 
-    // Add system message to the start of the messages array
     const messagesWithSystem = [systemMessage, ...messages];
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openai.beta.chat.completions.parse({
       model: 'gpt-4o-mini',
       messages: messagesWithSystem,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'extracted_intentions',
-          schema: {
-            type: 'object',
-            properties: chatConfig.customerIntention,
-            required: Object.keys(chatConfig.customerIntention),
-            additionalProperties: false
-          },
-          strict: true
-        }
-      }
+      response_format: zodResponseFormat(CustomerIntentionSchema, 'customer_intention')
     });
 
-    // TODO: Handle correct JSON format, or refusals
-
-    res.json(JSON.parse(completion.choices[0].message.content || '{}')); // Send the structured data as JSON
+    console.log('completion', completion.choices[0].message.parsed);
+    res.json(completion.choices[0].message.parsed);
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'An error occurred while processing the request' });
@@ -238,6 +222,39 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'An error occurred while generating custom content' });
+  }
+});
+
+app.post('/api/customer-prospect', async (req: Request, res: Response) => {
+  const { messages } = req.body;
+
+  if (!messages) {
+    res.status(400).json({ error: 'messages are required' });
+    return;
+  }
+
+  try {
+    const systemMessage = {
+      role: 'system',
+      content: `You are an AI assistant tasked with analyzing customer messages to extract details about what they're looking for.
+        Extract specific details about the type, price range, specifications, and preferences.
+        Only include information explicitly stated by the user or confirmed by them after suggestion.
+        You must return the data in the exact format specified by the schema.`
+    };
+
+    const messagesWithSystem = [systemMessage, ...messages];
+
+    const completion = await openai.beta.chat.completions.parse({
+      model: 'gpt-4o-mini',
+      messages: messagesWithSystem,
+      response_format: zodResponseFormat(CustomerProspectSchema, 'customer_prospect')
+    });
+
+    console.log('completion', completion.choices[0].message.parsed);
+    res.json(completion.choices[0].message.parsed);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'An error occurred while processing the request' });
   }
 });
 

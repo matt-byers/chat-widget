@@ -23,58 +23,6 @@
     "sizeOfParty": {
       "type": "string",
       "description": "How many people the customer intends to travel with."
-    },
-    "budget": {
-      "type": "string",
-      "description": "Roughly how much the customer wants to spend."
-    }
-  },
-  "customerIntention": {
-    "objective": {
-      "type": "string",
-      "description": "The primary goal the customer aims to achieve. If not clear, leave undefined.",
-      "enum": ["discover", "transact", "compare", "resolve", "customize"]
-    },
-    "budget": {
-      "type": "number",
-      "description": "The maximum amount the customer is willing to spend. If not explicity mentioned, leave undefined."
-    },
-    "urgency_level": {
-      "type": "number",
-      "description": "How urgently the customer needs to achieve their objective. (1: low, 2: medium, 3: high). If not clear, leave undefined.",
-      "enum": [1, 2, 3]
-    },
-    "pain_points": {
-      "type": "array",
-      "description": "The challenges or problems the customer is trying to solve. Unless explicitly stated, leave undefined.",
-      "items": {
-        "type": "string",
-        "description": "A specific pain point or challenge. If not clear, leave undefined.  "
-      }
-    },
-    "likes": {
-      "type": "array",
-      "description": "The customer's likes. If not clear, leave undefined.",
-      "items": {
-        "type": "string",
-        "description": "A specific like. If not clear, leave undefined."
-      }
-    },
-    "dislikes": {
-      "type": "array",
-      "description": "The customer's dislikes. If not clear, leave undefined.",
-      "items": {
-        "type": "string",
-        "description": "A specific dislike. If not clear, leave undefined."
-      }
-    },
-    "priorities": {
-      "type": "array",
-      "description": "The customer's preferences. If not clear, leave undefined.",
-      "items": {
-        "type": "string",
-        "description": "Single word description of a priority. E.g. price, location, style. If not clear, leave undefined."
-      }
     }
   }
 }
