@@ -9,14 +9,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (Object.keys(searchData).length > 0) {
       // Handle search data changes
-      console.log('Search data updated:', searchData);
     }
   }, [searchData]);
 
   useEffect(() => {
     if (Object.keys(customerIntention).length > 0) {
       // Handle intention changes
-      console.log('Customer intention updated:', customerIntention);
     }
   }, [customerIntention]);
 
@@ -56,7 +54,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   main: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: 'red',
     padding: '20px',
   },
   footer: {
