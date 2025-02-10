@@ -1,24 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chat.scss';
+import { useChatStore } from './store/chatStore';
 
-interface ChatProps {
-  onSearchUpdate: (data: Record<string, any>) => void;
-  onIntentionUpdate: (data: Record<string, any>) => void;
-}
+interface ChatProps {} // Empty for now, might need other props later
 
-interface OpenAIMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+const Chat: React.FC<ChatProps> = () => {
+  const { 
+    messages, 
+    addMessage, 
+    updateLastAssistantMessage,
+    updateSearchData,
+    updateCustomerIntention
+  } = useChatStore();
 
-const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
   // Chat content
-  const [messages, setMessages] = useState<OpenAIMessage[]>([]);
   const [input, setInput] = useState('');
-
-  // Data states
-  const [searchData, setSearchData] = useState<Record<string, any>>({});
-  const [customerIntention, setCustomerIntention] = useState<Record<string, any>>({});
 
   // UI states
   const [isStreaming, setIsStreaming] = useState(false);
@@ -40,8 +36,9 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
       const lastMessage = messages[messages.length - 1].content;
 
       await moderateUserMessage(lastMessage);
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]); // Placeholder assistant message
       processExtraction();
+
+      addMessage({ role: 'assistant', content: '' });
 
       try {
         const response = await fetch('http://localhost:5001/api/chat', {
@@ -67,20 +64,12 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
 
           if (chunkValue) {
             botMessage += chunkValue;
-            setMessages(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = { role: 'assistant', content: botMessage };
-              return updated;
-            });
+            updateLastAssistantMessage(botMessage);
           }
         }
       } catch (error) {
         console.error('Error in handleMessage:', error);
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: 'assistant', content: 'Sorry, something went wrong.' };
-          return updated;
-        });
+        updateLastAssistantMessage('Sorry, something went wrong.');
       } finally {
         setIsStreaming(false);
         chatControllerRef.current = null;
@@ -108,10 +97,7 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
 
     if (moderationResult.flagged) {
       console.log('Content flagged by moderation');
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "I can't help with that."
-      }]);
+      addMessage({ role: 'assistant', content: "I can't help with that." });
       return;
     }
 
@@ -122,17 +108,25 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
     if (messages.length === 0) return;
 
     setIsExtracting(true);
+    const { searchData: currentSearchData, customerIntention: currentIntention } = useChatStore.getState();
+
     try {
       const [searchResponse, intentionResponse] = await Promise.all([
         fetch('http://localhost:5001/api/search-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify({ 
+            messages,
+            currentData: currentSearchData  // Pass current search data
+          }),
         }),
         fetch('http://localhost:5001/api/customer-intention', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify({ 
+            messages,
+            currentData: currentIntention  // Pass current intention data
+          }),
         })
       ]);
 
@@ -152,55 +146,11 @@ const Chat: React.FC<ChatProps> = ({ onSearchUpdate, onIntentionUpdate }) => {
     }
   };
 
-  useEffect(() => {
-    if (Object.keys(searchData).length > 0) {
-      onSearchUpdate(searchData);
-    }
-  }, [searchData]);
-
-  useEffect(() => {
-    if (Object.keys(customerIntention).length > 0) {
-      onIntentionUpdate(customerIntention);
-    }
-  }, [customerIntention]);
-
-  const updateSearchData = (newData: Record<string, any>) => {
-    console.log('Updating search data with:', newData);
-    setSearchData(prevState => {
-      const updatedData = { ...prevState };
-
-      for (const key in newData) {
-        if (newData[key] !== undefined && newData[key] !== null) {
-          updatedData[key] = newData[key];
-        }
-      }
-
-      console.log('Final search data:', updatedData);
-      return updatedData;
-    });
-  };
-
-  const updateCustomerIntention = (newData: Record<string, any>) => {
-    console.log('Updating customer intention with:', newData);
-    setCustomerIntention(prevState => {
-      const updatedData = { ...prevState };
-
-      for (const key in newData) {
-        if (newData[key] !== undefined && newData[key] !== null) {
-          updatedData[key] = newData[key];
-        }
-      }
-
-      console.log('Final customer intention:', updatedData);
-      return updatedData;
-    });
-  };
-
   const handleSend = async () => {
     if (!input.trim()) return;
     const currentInput = input;
 
-    setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
+    addMessage({ role: 'user', content: currentInput });
     setInput('');
     textareaRef.current?.focus();
   };

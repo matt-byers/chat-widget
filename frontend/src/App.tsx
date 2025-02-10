@@ -1,39 +1,24 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Chat from "./Chat";
+import { useChatStore } from './store/chatStore';
 
 const App: React.FC = () => {
-  const [searchData, setSearchData] = useState<Record<string, any>>({});
-  const [customerIntention, setCustomerIntention] = useState<Record<string, any>>({});
+  const { searchData, customerIntention } = useChatStore();
   
-  const handleSearchUpdate = useCallback((newData: Record<string, any>) => {
-    console.log('App: handleSearchUpdate triggered with data:', newData);
-    setSearchData(prevState => {
-      const updatedData = { ...prevState };
+  // Now you can watch the state directly
+  useEffect(() => {
+    if (Object.keys(searchData).length > 0) {
+      // Handle search data changes
+      console.log('Search data updated:', searchData);
+    }
+  }, [searchData]);
 
-      for (const key in newData) {
-        if (newData[key] !== undefined && newData[key] !== null) {
-          updatedData[key] = newData[key];
-        }
-      }
-
-      return updatedData;
-    });
-  }, []);
-  
-  const handleIntentionUpdate = useCallback((newData: { [key: string]: any }) => {
-    console.log('App: handleIntentionUpdate triggered with data:', newData);
-    setCustomerIntention(prevState => {
-      const updatedData = { ...prevState };
-
-      for (const key in newData) {
-        if (newData[key] !== undefined && newData[key] !== null) {
-          updatedData[key] = newData[key];
-        }
-      }
-
-      return updatedData;
-    });
-  }, []);
+  useEffect(() => {
+    if (Object.keys(customerIntention).length > 0) {
+      // Handle intention changes
+      console.log('Customer intention updated:', customerIntention);
+    }
+  }, [customerIntention]);
 
   return (
     <div style={styles.wrapper}>
@@ -50,7 +35,7 @@ const App: React.FC = () => {
           <pre>{JSON.stringify(customerIntention, null, 2)}</pre>
         </div>
       </main>
-      <Chat onSearchUpdate={handleSearchUpdate} onIntentionUpdate={handleIntentionUpdate} />
+      <Chat />
       <footer style={styles.footer}>
         <p>Footer</p>
       </footer>

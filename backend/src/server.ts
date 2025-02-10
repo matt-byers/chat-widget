@@ -102,7 +102,7 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
 
 // Return search data from user messages
 app.post('/api/search-data', async (req: Request, res: Response) => {
-  const { messages } = req.body;
+  const { messages, currentData } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages and searchData are required' });
@@ -113,7 +113,16 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
     // Create system message for search data extraction
     const systemMessage = {
       role: 'system',
-      content: `You are an AI assistant tasked with extracting search-related information from user messages. You must return the data in the exact format specified by the schema. Examine the chat to get the most up to data search data. If the assistant has suggested anything, and the user has agreed, then update the search data. For example, if the assistant says "what about Bali", and the user says "yes, that sounds good", then update the search data to include Bali. Do not change the search data unless you are sure you have updated requests from the user.`
+      content: `You are an AI assistant tasked with extracting search-related information from user messages. You must return the data in the exact format specified by the schema. Examine the chat to get the most up to data search data. If the assistant has suggested anything, and the user has agreed, then update the search data. For example, if the assistant says "what about Bali", and the user says "yes, that sounds good", then update the search data to include Bali. Do not change the search data unless you are sure you have updated requests from the user.
+
+Current search data: ${JSON.stringify(currentData)}
+
+Additional rules for handling current data:
+1. Preserve all fields from current data unless new information explicitly updates them
+2. Add new fields when discovered
+3. For arrays (like dates or locations), combine existing and new values
+4. Only update a field if the new information is more specific or corrects previous data
+5. Return the complete merged object`
     };
 
     // Add system message to the start of the messages array
@@ -147,7 +156,7 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
 });
 
 app.post('/api/customer-intention', async (req: Request, res: Response) => {
-  const { messages } = req.body;
+  const { messages, currentData } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages are required' });
@@ -160,7 +169,15 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
       content: `You are an AI assistant tasked with analyzing customer intentions from their messages.
         You must determine their objective, urgency, pain points, and satisfaction level based on the conversation context.
         Do not make any determination on any data point without explicit statements from the user, or explicit affirmations from the user after the assistant has suggested something.
-        You must return the data in the exact format specified by the schema.`
+        You must return the data in the exact format specified by the schema.
+
+        Current intention data: ${JSON.stringify(currentData)}
+
+        Additional rules for handling current data:
+        1. Preserve all fields from current data unless new information explicitly updates them
+        2. Add new fields when discovered
+        3. Only update a field if the new information provides clearer insight into the customer's intentions
+        4. Return the complete merged object`
     };
 
     const messagesWithSystem = [systemMessage, ...messages];
