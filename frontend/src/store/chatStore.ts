@@ -1,10 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-interface OpenAIMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+import { OpenAIMessage } from '@chat-widget/utils';
 
 interface ChatState {
   searchData: Record<string, any>;
@@ -14,6 +10,10 @@ interface ChatState {
   updateCustomerIntention: (newData: Record<string, any>) => void;
   addMessage: (message: { role: 'user' | 'assistant'; content: string }) => void;
   updateLastAssistantMessage: (content: string) => void;
+  isSearchInProgress: boolean;
+  setSearchInProgress: (inProgress: boolean) => void;
+  syncSearchState: (searchData: Record<string, any>) => void;
+  reset: () => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -24,7 +24,6 @@ export const useChatStore = create<ChatState>()(
       messages: [],
       
       updateSearchData: (newData) => {
-        console.log('Updating search data with:', newData);
         const updatedData = { ...get().searchData };
         
         for (const key in newData) {
@@ -33,12 +32,10 @@ export const useChatStore = create<ChatState>()(
           }
         }
         
-        console.log('Final search data:', updatedData);
         set({ searchData: updatedData });
       },
       
       updateCustomerIntention: (newData) => {
-        console.log('Updating customer intention with:', newData);
         const updatedData = { ...get().customerIntention };
         
         for (const key in newData) {
@@ -47,7 +44,6 @@ export const useChatStore = create<ChatState>()(
           }
         }
         
-        console.log('Final customer intention:', updatedData);
         set({ customerIntention: updatedData });
       },
       
@@ -62,15 +58,42 @@ export const useChatStore = create<ChatState>()(
         // Replace the entire content with the accumulated message
         messages[lastIndex].content = content;
         set({ messages });
-      }
+      },
+      
+      isSearchInProgress: false,
+      
+      setSearchInProgress: (inProgress) => {
+        set({ isSearchInProgress: inProgress });
+      },
+
+      syncSearchState: (searchData) => {
+        const currentState = get();
+        
+        set({ searchData });
+        
+        currentState.addMessage({
+          role: 'assistant',
+          content: formatSearchMessage(searchData)
+        });
+      },
+
+      reset: () => set({ searchData: {}, customerIntention: {}, messages: [], isSearchInProgress: false}),
     }),
     {
       name: 'chat-storage',
       partialize: (state) => ({ 
         searchData: state.searchData,
         customerIntention: state.customerIntention,
-        messages: state.messages
+        messages: state.messages,
+        isSearchInProgress: state.isSearchInProgress
       })
     }
   )
-); 
+);
+
+function formatSearchMessage(searchData: Record<string, any>): string {
+  const parts = [];
+  if (searchData.location) parts.push(`location: ${searchData.location}`);
+  if (searchData.dates) parts.push(`dates: ${searchData.dates}`);
+  return `🔍 You searched for ${parts.join(', ')}`;
+} 

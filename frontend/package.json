@@ -14,10 +14,12 @@
     "node-sass": "^7.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.3",
     "react-scripts": "5.0.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4",
-    "zustand": "^5.0.3"
+    "zustand": "^5.0.3",
+    "@chat-widget/utils": "file:../utils"
   },
   "scripts": {
     "start": "react-scripts start",

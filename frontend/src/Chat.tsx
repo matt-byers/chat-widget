@@ -1,14 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import './Chat.scss';
 import { useChatStore } from './store/chatStore';
+import { SearchConfig } from '@chat-widget/utils';
 
-const Chat: React.FC = () => {
+interface ChatProps {
+  onUpdateSearchClick?: () => void;
+  searchConfig: SearchConfig;
+  onSearchComplete?: (searchData: Record<string, any>) => void;
+}
+
+const Chat: React.FC<ChatProps> = ({ 
+  onUpdateSearchClick, 
+  searchConfig,
+  onSearchComplete 
+}) => {
   const { 
     messages, 
     addMessage, 
     updateLastAssistantMessage,
     updateSearchData,
-    updateCustomerIntention
+    updateCustomerIntention,
+    reset
   } = useChatStore();
 
   // Chat content
@@ -19,6 +32,7 @@ const Chat: React.FC = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [isTransparent, setIsTransparent] = useState(false);
   const [isMinimised, setIsMinimised] = useState(false);
+  const [isSearchDataUpdated, setIsSearchDataUpdated] = useState(false);
 
   // Refs
   const chatControllerRef = useRef<AbortController | null>(null);
@@ -42,7 +56,10 @@ const Chat: React.FC = () => {
         const response = await fetch('http://localhost:5001/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify({ 
+            messages,
+            searchConfig 
+          }),
           signal: chatControllerRef.current.signal,
         });
 
@@ -78,8 +95,6 @@ const Chat: React.FC = () => {
   }, [messages]);
 
   const moderateUserMessage = async (message: string) => {
-    console.log('Checking moderation for:', message);
-
     const moderationResponse = await fetch('http://localhost:5001/api/moderate-user-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -91,15 +106,11 @@ const Chat: React.FC = () => {
     }
 
     const moderationResult = await moderationResponse.json();
-    console.log('Moderation result:', moderationResult);
 
     if (moderationResult.flagged) {
-      console.log('Content flagged by moderation');
       addMessage({ role: 'assistant', content: "I can't help with that." });
       return;
     }
-
-    console.log('Content passed moderation, proceeding with chat');
   };
 
   const processExtraction = async () => {
@@ -115,7 +126,8 @@ const Chat: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             messages,
-            currentData: currentSearchData  // Pass current search data
+            currentData: currentSearchData,
+            searchConfig
           }),
         }),
         fetch('http://localhost:5001/api/customer-intention', {
@@ -123,13 +135,15 @@ const Chat: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             messages,
-            currentData: currentIntention  // Pass current intention data
+            currentData: currentIntention
           }),
         })
       ]);
 
       if (searchResponse.ok) {
         const searchData = await searchResponse.json();
+        const hasChanges = JSON.stringify(searchData) !== JSON.stringify(currentSearchData);
+        setIsSearchDataUpdated(hasChanges);
         updateSearchData(searchData);
       }
 
@@ -195,6 +209,17 @@ const Chat: React.FC = () => {
     };
   }, []);
 
+  const handleUpdateSearchClick = () => {
+    if (onUpdateSearchClick) {
+      onUpdateSearchClick();
+      setIsSearchDataUpdated(false);
+    }
+  };
+
+  const resetChatState = () => {
+    reset();
+  };
+
   return (
     <div className={`wrapper ${isTransparent ? 'transparent' : ''} ${isMinimised ? 'minimised' : ''}`}>
       {isMinimised ? (
@@ -212,7 +237,8 @@ const Chat: React.FC = () => {
       ) : (
         <>
           <div className={`container ${isTransparent ? 'transparent' : ''}`}>
-            <div className="headerContainer " role="banner" aria-label="Chat header">
+            <div className="headerContainer" role="banner" aria-label="Chat header">
+              <button className="button action-button" onClick={resetChatState}>Reset State</button>
               <button
                 aria-label="Minimise chat"
                 onClick={handleMinimise}
@@ -251,7 +277,11 @@ const Chat: React.FC = () => {
                     role="article" // Role to indicate a message
                     aria-label={`Message from ${msg.role}: ${msg.content}`} // Label for screen readers
                   >
-                    {msg.content}
+                    {msg.role === 'assistant' ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 ))}
               {isStreaming && (
@@ -259,6 +289,20 @@ const Chat: React.FC = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
                     <path fill="currentColor" d="M8 16a8 8 0 110-16 8 8 0 010 16zm0-1a7 7 0 100-14 7 7 0 000 14zM8 0a.75.75 0 01.75.75v6.5a.75.75 0 11-1.5 0V.75A.75.75 0 018 0z"></path>
                   </svg>
+                </div>
+              )}
+              {/* TODO: Only show button if all required search data is present */}
+              {isSearchDataUpdated && !isStreaming && (
+                <div className="updateSearchPrompt">
+                  <p>Do you want to update the search?</p>
+                  <button
+                    onClick={handleUpdateSearchClick}
+                    className="button action-button"
+                    type="button"
+                    aria-label="Update search with new data"
+                  >
+                    Update Search
+                  </button>
                 </div>
               )}
             </div>

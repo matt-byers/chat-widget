@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { CustomContentRequest } from '../types/content';
+import { CustomContentRequest } from '@chat-widget/utils';
 
 export class ContentGeneratorService {
   constructor(private openai: OpenAI) {}
@@ -40,7 +40,7 @@ export class ContentGeneratorService {
 
           ${textExamples.length > 0 ? `
           These are examples of text shown in a similar context:
-          ${textExamples.map(example => `- ${example}`).join('\n')}
+          ${textExamples.map((example) => `- ${example}`).join('\n')}
           ` : ''}
 
           Understanding the item information and customer intention, generate custom text with the following instructions:

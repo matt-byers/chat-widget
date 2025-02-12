@@ -14,6 +14,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "@chat-widget/utils": "file:../utils",
     "express": "^4.21.1",
     "express-rate-limit": "^7.5.0",
     "openai": "^4.67.3",

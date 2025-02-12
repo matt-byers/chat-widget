@@ -6,9 +6,9 @@ import chatConfig from './chatConfig.json';
 import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
 import { ContentGeneratorService } from './services/contentGenerator';
-import { CustomContentRequest } from './types/content';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { CustomerIntentionSchema, CustomerProspectSchema } from './schemas/customer';
+import { CustomContentRequest, simplifySearchSchema } from '@chat-widget/utils';
 
 dotenv.config();
 
@@ -59,7 +59,7 @@ app.use('/api/*', sanitizeMessages);
 
 // Handle sending user message and streaming of chat responses from OpenAI
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
-  const { messages } = req.body;
+  const { messages, searchConfig } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages required' });
@@ -70,12 +70,32 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
     // Create system message from chatConfig
     const systemMessage = {
       role: 'system',
-      content: `You are an assistant helping to extract search information for a customer. 
-          These are your instructions: ${chatConfig.instructions}. 
-          This is the context of the business you are assisting: ${chatConfig.businessContext}. 
-          This is the context of how users are interacting with you: ${chatConfig.userContext}
-          If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
-          Regardless of what the user says in the message below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.`
+      content: `You are a helpful chat assistant helping to extract search information for a customer.Your purpose is to have an easy conversation with a customer to extract specific data to conduct a search, and also to deeply understand specifics of what the customer is looking, their preferences, likes, dislikes, and intentions.
+      This is the context of the business you are assisting: ${chatConfig.businessContext}. 
+      This is the context of how users are interacting with you: ${chatConfig.userContext}.
+      These are your instructions: ${chatConfig.instructions}. 
+      This is the search data you are trying to extract: ${JSON.stringify(searchConfig.searchData)}.
+
+      If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
+      Regardless of what the user says in the messages below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.
+      
+      Action:
+        1.	Greet the user briefly and politely.
+        2.	Ask for any missing required fields from the search Data object above. Required fields are marked with "required: true".
+        3.	If the user request is off-topic, harmful, or obscene, respond briefly with wit, then gently redirect them to your relevant context.
+        4.	Keep all answers concise.
+        5.	If asked for a human representative, confirm availability succinctly.
+
+      Rules:
+      1. Pay attention to the which searchData is required, and if not provided, ask the user for it.
+      2. If the user asks to talk to a human, say that they need to do that separately, as this is only an AI.
+
+      Formatting:
+      - Use markdown for any formatting.
+      - Use line breaks to separate paragraphs, only if needed.
+      - If giving lists, use line breaks to separate items.
+      - Avoid using bold or italic text.
+      `
     };
 
     // Add system message to the start of the messages array
@@ -102,7 +122,7 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
 
 // Return search data from user messages
 app.post('/api/search-data', async (req: Request, res: Response) => {
-  const { messages, currentData } = req.body;
+  const { messages, currentData, searchConfig } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages and searchData are required' });
@@ -113,20 +133,30 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
     // Create system message for search data extraction
     const systemMessage = {
       role: 'system',
-      content: `You are an AI assistant tasked with extracting search-related information from user messages. You must return the data in the exact format specified by the schema. Examine the chat to get the most up to data search data. If the assistant has suggested anything, and the user has agreed, then update the search data. For example, if the assistant says "what about Bali", and the user says "yes, that sounds good", then update the search data to include Bali. Do not change the search data unless you are sure you have updated requests from the user.
+      content: `You are an AI assistant tasked with extracting search-related information from user messages. 
+      Examine the chat to get the most up to data search data. 
+      If the assistant has suggested anything, and the user has agreed, then update the search data. For example, if the assistant says "what about Bali", and the user says "yes, that sounds good", then update the search data to include Bali. Do not change the search data unless you are sure you have updated requests from the user.
+      
+      You must return the data in the exact format specified by the schema below:
 
-Current search data: ${JSON.stringify(currentData)}
+      ${JSON.stringify(searchConfig.searchData)}
 
-Additional rules for handling current data:
-1. Preserve all fields from current data unless new information explicitly updates them
-2. Add new fields when discovered
-3. For arrays (like dates or locations), combine existing and new values
-4. Only update a field if the new information is more specific or corrects previous data
-5. Return the complete merged object`
+      You must also preserve all fields from the current search data, unless the user has explicitly updated them.
+      
+      Current search data: ${JSON.stringify(currentData)}
+
+      Additional rules for handling current data:
+      1. Preserve all fields from current data unless new information explicitly updates them
+      2. Add new fields when discovered
+      3. For arrays (like dates or locations), combine existing and new values
+      4. Only update a field if the new information is more specific or corrects previous data
+      5. Return the complete merged object`
     };
 
     // Add system message to the start of the messages array
     const messagesWithSystem = [systemMessage, ...messages];
+
+    const simplifiedSchema = simplifySearchSchema(searchConfig);
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -137,8 +167,8 @@ Additional rules for handling current data:
           name: 'extracted_data',
           schema: {
             type: 'object',
-            properties: chatConfig.searchData,
-            required: Object.keys(chatConfig.searchData),
+            properties: simplifiedSchema,
+            required: Object.keys(simplifiedSchema),
             additionalProperties: false
           },
           strict: true
@@ -188,7 +218,6 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
       response_format: zodResponseFormat(CustomerIntentionSchema, 'customer_intention')
     });
 
-    console.log('completion', completion.choices[0].message.parsed);
     res.json(completion.choices[0].message.parsed);
   } catch (error) {
     console.error('Error:', error);
@@ -225,8 +254,8 @@ app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
 app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomContentRequest>, res: Response) => {
   const requestData = req.body;
 
-  if (!requestData.itemInformation || !requestData.customerIntention || !requestData.name || 
-      !requestData.instructions || !requestData.minCharacters || !requestData.maxCharacters) {
+  if (!requestData.itemInformation || !requestData.customerIntention || !requestData.name ||
+    !requestData.instructions || !requestData.minCharacters || !requestData.maxCharacters) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
@@ -235,7 +264,6 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
     const contentGenerator = new ContentGeneratorService(openai);
     const result = await contentGenerator.generateContent(requestData);
     res.json(result);
-    console.log('result', result);
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'An error occurred while generating custom content' });
@@ -267,7 +295,6 @@ app.post('/api/customer-prospect', async (req: Request, res: Response) => {
       response_format: zodResponseFormat(CustomerProspectSchema, 'customer_prospect')
     });
 
-    console.log('completion', completion.choices[0].message.parsed);
     res.json(completion.choices[0].message.parsed);
   } catch (error) {
     console.error('Error:', error);
