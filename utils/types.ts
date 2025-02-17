@@ -26,6 +26,8 @@ export interface OpenAIMessage {
   content: string;
 }
 
+// TODO does it make sense to add a customerIntention interface?
+
 // Content generation types
 export interface CustomContentRequest {
   itemInformation: Record<string, any>;
@@ -34,7 +36,9 @@ export interface CustomContentRequest {
   instructions: string;
   minCharacters: number;
   maxCharacters: number;
+  tone?: 'positive' | 'neutral' | 'factual' | 'fun';
   textExamples?: string[];
+  strongMatchOnly?: boolean;
 }
 
 // Helper function to simplify a search schema (used for constructing prompts)
@@ -52,4 +56,62 @@ export function simplifySearchSchema(config: SearchConfig) {
     },
     {}
   );
-} 
+}
+
+// Base interface with only required fields
+interface BaseContentResponse {
+  scenario: string;
+  metadata: {
+    name: string;
+  };
+}
+
+/**
+ * For when no strong-match check is requested
+ */
+export interface StandardGenerationResponse extends BaseContentResponse {
+  scenario: 'noMatchRequired';
+  content: string;
+  explanation: string;
+  metadata: {
+    name: string;
+    customerIntentionUsed: string[];
+    characterCount: number;
+  };
+}
+
+/**
+ * For when strong match is requested and succeeds
+ */
+export interface StrongMatchSuccessResponse extends BaseContentResponse {
+  scenario: 'strongMatchSuccess';
+  content: string;
+  explanation: string;
+  metadata: {
+    name: string;
+    customerIntentionUsed: string[];
+    characterCount: number;
+    matchScore: number;
+    matchScoreThreshold: number;
+  };
+}
+
+/**
+ * For when strong match is requested but fails
+ */
+export interface StrongMatchFailureResponse extends BaseContentResponse {
+  scenario: 'strongMatchFailure';
+  metadata: {
+    name: string;
+    matchScore: number;
+    matchScoreThreshold: number;
+  };
+}
+
+/**
+ * Union of all possible responses
+ */
+export type ContentGenerationResult = 
+  | StandardGenerationResponse
+  | StrongMatchSuccessResponse
+  | StrongMatchFailureResponse; 

@@ -22,6 +22,7 @@
     "@chat-widget/utils": "file:../utils"
   },
   "scripts": {
+    "prestart": "npm install --prefix ../utils",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

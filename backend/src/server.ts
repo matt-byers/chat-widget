@@ -193,6 +193,11 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
     return;
   }
 
+  // TODO: Improve the quality of this prompt. Make it more structured with process, rules, context, etc.
+  // Put the json output structure in the prompt, explaining the fields and their definitions. Come up with clear conceptual delineations between each field. We want to avoid double double ups. Likes and dislikes are thematic. Priorities should have a higher bar.
+  // Add rules about how to handle changing preferences, i.e. when someone contradicts themselves or changes their mind "i want somewhere hot, actually lets look somewhere cold"
+  // Clarify the format, length, and descriptive nature of likes, dislikes, and priorities. Ensure these are descriptive enough to be used as embeddings, or fed into other model inputs.
+  // Come up with a way of handling conflicting or contradictory preferences. Customer prospect?
   try {
     const systemMessage = {
       role: 'system',
@@ -254,9 +259,21 @@ app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
 app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomContentRequest>, res: Response) => {
   const requestData = req.body;
 
-  if (!requestData.itemInformation || !requestData.customerIntention || !requestData.name ||
-    !requestData.instructions || !requestData.minCharacters || !requestData.maxCharacters) {
+  // TODO: Is there a better way to do this? Can we do in constructor?
+  if (!requestData.itemInformation || 
+      !requestData.customerIntention || 
+      !requestData.name ||
+      !requestData.instructions || 
+      !requestData.minCharacters || 
+      !requestData.maxCharacters) {
     res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  // TODO: move this validate tones to the constructor
+  const validTones = ['positive', 'neutral', 'factual', 'fun'];
+  if (requestData.tone && !validTones.includes(requestData.tone)) {
+    res.status(400).json({ error: 'Invalid tone specified' });
     return;
   }
 
@@ -265,7 +282,7 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
     const result = await contentGenerator.generateContent(requestData);
     res.json(result);
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[API] Content generation error:', error);
     res.status(500).json({ error: 'An error occurred while generating custom content' });
   }
 });
