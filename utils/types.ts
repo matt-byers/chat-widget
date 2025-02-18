@@ -16,7 +16,7 @@ export interface SearchFieldConfig {
   example?: any;
 }
 
-export interface SearchConfig {
+export interface SearchConfigSchema {
   searchData: Record<string, SearchFieldConfig>;
 }
 
@@ -42,7 +42,7 @@ export interface CustomContentRequest {
 }
 
 // Helper function to simplify a search schema (used for constructing prompts)
-export function simplifySearchSchema(config: SearchConfig) {
+export function simplifySearchSchema(config: SearchConfigSchema) {
   return Object.entries(config.searchData).reduce(
     (
       acc: Record<string, { type: string; description: string }>, 
@@ -109,9 +109,28 @@ export interface StrongMatchFailureResponse extends BaseContentResponse {
 }
 
 /**
- * Union of all possible responses
+ * Defines the structure for content generation responses.
+ * Three possible scenarios:
+ * 1. noMatchRequired: Standard generation without match checking
+ * 2. strongMatchSuccess: Match check passed, content generated
+ * 3. strongMatchFailure: Match check failed, no content generated
+ * 
+ * Each scenario includes relevant metadata about the generation process.
  */
 export type ContentGenerationResult = 
   | StandardGenerationResponse
   | StrongMatchSuccessResponse
-  | StrongMatchFailureResponse; 
+  | StrongMatchFailureResponse;
+
+export function hasAllRequiredFields(
+  searchData: Record<string, any>, 
+  searchConfig: SearchConfigSchema
+): boolean {
+  return Object.entries(searchConfig.searchData).every(([key, config]) => {
+    if (config.required) {
+      const value = searchData[key];
+      return value !== undefined && value !== null && value !== '';
+    }
+    return true;
+  });
+} 

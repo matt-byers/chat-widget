@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import Chat from "./Chat";
 import { useChatStore } from './store/chatStore';
-import { SearchConfig } from '@chat-widget/utils';
+import { SearchConfigSchema } from '@chat-widget/utils';
 import CustomText from './components/CustomText';
 
 interface Destination {
@@ -101,9 +101,13 @@ const tagExamples = [
 ];
 
 const App: React.FC = () => {
-  const { searchData, customerIntention, setSearchInProgress, syncSearchState } = useChatStore();
+  const { 
+    searchData, 
+    customerIntention, 
+    syncSearchState,
+    setSearchTrigger
+  } = useChatStore();
   
-  // Now you can watch the state directly
   useEffect(() => {
     if (Object.keys(searchData).length > 0) {
       // Handle search data changes
@@ -122,7 +126,7 @@ const App: React.FC = () => {
   };
 
   // Test search config
-  const testSearchConfig: SearchConfig = {
+  const testSearchConfig: SearchConfigSchema = {
     searchData: {
       location: {
         type: 'string',
@@ -149,23 +153,23 @@ const App: React.FC = () => {
 
   // Test search handler
   const handleTestSearch = () => {
-    // Simulate search starting
-    setSearchInProgress(true);
-
-    // Simulate API call delay
     setTimeout(() => {
-      // Simulate search completion
-      const testSearchResult = {
+      const testSearchData = {
         location: 'Paris, France',
         startDate: '2024-06-01',
         endDate: '2024-06-07'
       };
       
-      // Sync the chat state with the search
-      syncSearchState(testSearchResult);
-      setSearchInProgress(false);
+      syncSearchState(testSearchData);
     }, 1500);
   };
+
+  // Set up search trigger once
+  useEffect(() => {
+    setSearchTrigger(() => {
+      handleUpdateSearchClick();
+    });
+  }, []);
 
   return (
     <div style={styles.wrapper}>
@@ -210,10 +214,7 @@ const App: React.FC = () => {
       </main>
       <Chat 
         searchConfig={testSearchConfig}
-        onUpdateSearchClick={handleTestSearch}
-        onSearchComplete={(data) => {
-          console.log('Search completed with data:', data);
-        }}
+        requireManualSearch={true}
       />
       <footer style={styles.footer}>
         <p>Footer</p>

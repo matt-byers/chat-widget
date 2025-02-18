@@ -2,18 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './Chat.scss';
 import { useChatStore } from './store/chatStore';
-import { SearchConfig } from '@chat-widget/utils';
+import { SearchConfigSchema } from '@chat-widget/utils';
 
 interface ChatProps {
-  onUpdateSearchClick?: () => void;
-  searchConfig: SearchConfig;
-  onSearchComplete?: (searchData: Record<string, any>) => void;
+  searchConfig: SearchConfigSchema;
+  requireManualSearch?: boolean;
 }
 
 const Chat: React.FC<ChatProps> = ({ 
-  onUpdateSearchClick, 
   searchConfig,
-  onSearchComplete 
+  requireManualSearch = false
 }) => {
   const { 
     messages, 
@@ -21,7 +19,12 @@ const Chat: React.FC<ChatProps> = ({
     updateLastAssistantMessage,
     updateSearchData,
     updateCustomerIntention,
-    reset
+    isSearchDataUpdated,
+    setSearchDataUpdated,
+    setSearchConfig,
+    canTriggerSearch,
+    triggerSearch,
+    resetChatState
   } = useChatStore();
 
   // Chat content
@@ -29,15 +32,23 @@ const Chat: React.FC<ChatProps> = ({
 
   // UI states
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [isExtractingSearch, setIsExtractingSearch] = useState(false);
+  const [isExtractingIntention, setIsExtractingIntention] = useState(false);
   const [isTransparent, setIsTransparent] = useState(false);
   const [isMinimised, setIsMinimised] = useState(false);
-  const [isSearchDataUpdated, setIsSearchDataUpdated] = useState(false);
 
   // Refs
   const chatControllerRef = useRef<AbortController | null>(null);
+  const searchDataControllerRef = useRef<AbortController | null>(null);
+  const intentionControllerRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatWindowRef = useRef<HTMLDivElement>(null);
+
+  // Initialize search config once on mount
+  useEffect(() => {
+    setSearchConfig(searchConfig);
+    useChatStore.setState({ requireManualSearch });
+  }, []); // Empty dependency array = only run on mount
 
   useEffect(() => {
     if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return; // Only process user messages
@@ -48,7 +59,8 @@ const Chat: React.FC<ChatProps> = ({
       const lastMessage = messages[messages.length - 1].content;
 
       await moderateUserMessage(lastMessage);
-      processExtraction();
+      extractSearchData();
+      extractCustomerIntention();
 
       addMessage({ role: 'assistant', content: '' });
 
@@ -113,48 +125,78 @@ const Chat: React.FC<ChatProps> = ({
     }
   };
 
-  const processExtraction = async () => {
+  const extractSearchData = async () => {
     if (messages.length === 0) return;
-
-    setIsExtracting(true);
-    const { searchData: currentSearchData, customerIntention: currentIntention } = useChatStore.getState();
-
+    
+    if (searchDataControllerRef.current) {
+      searchDataControllerRef.current.abort();
+    }
+    
+    searchDataControllerRef.current = new AbortController();
+    const { searchData: currentSearchData } = useChatStore.getState();
+    
+    setIsExtractingSearch(true);
     try {
-      const [searchResponse, intentionResponse] = await Promise.all([
-        fetch('http://localhost:5001/api/search-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            messages,
-            currentData: currentSearchData,
-            searchConfig
-          }),
+      const searchResponse = await fetch('http://localhost:5001/api/search-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages,
+          currentData: currentSearchData,
+          searchConfig
         }),
-        fetch('http://localhost:5001/api/customer-intention', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            messages,
-            currentData: currentIntention
-          }),
-        })
-      ]);
-
+        signal: searchDataControllerRef.current.signal
+      });
+  
       if (searchResponse.ok) {
         const searchData = await searchResponse.json();
         const hasChanges = JSON.stringify(searchData) !== JSON.stringify(currentSearchData);
-        setIsSearchDataUpdated(hasChanges);
+        setSearchDataUpdated(hasChanges);
         updateSearchData(searchData);
       }
-
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error extracting search data:', error);
+      }
+    } finally {
+      searchDataControllerRef.current = null;
+      setIsExtractingSearch(false);
+    }
+  };
+  
+  const extractCustomerIntention = async () => {
+    if (messages.length === 0) return;
+    
+    if (intentionControllerRef.current) {
+      intentionControllerRef.current.abort();
+    }
+    
+    intentionControllerRef.current = new AbortController();
+    const { customerIntention: currentIntention } = useChatStore.getState();
+    
+    setIsExtractingIntention(true);
+    try {
+      const intentionResponse = await fetch('http://localhost:5001/api/customer-intention', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages,
+          currentData: currentIntention
+        }),
+        signal: intentionControllerRef.current.signal
+      });
+  
       if (intentionResponse.ok) {
         const intentionData = await intentionResponse.json();
         updateCustomerIntention(intentionData);
       }
-    } catch (error) {
-      console.error('Error during extraction:', error);
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error extracting customer intention:', error);
+      }
     } finally {
-      setIsExtracting(false);
+      intentionControllerRef.current = null;
+      setIsExtractingIntention(false);
     }
   };
 
@@ -206,19 +248,14 @@ const Chat: React.FC<ChatProps> = ({
       if (chatControllerRef.current) {
         chatControllerRef.current.abort();
       }
+      if (searchDataControllerRef.current) {
+        searchDataControllerRef.current.abort();
+      }
+      if (intentionControllerRef.current) {
+        intentionControllerRef.current.abort();
+      }
     };
   }, []);
-
-  const handleUpdateSearchClick = () => {
-    if (onUpdateSearchClick) {
-      onUpdateSearchClick();
-      setIsSearchDataUpdated(false);
-    }
-  };
-
-  const resetChatState = () => {
-    reset();
-  };
 
   return (
     <div className={`wrapper ${isTransparent ? 'transparent' : ''} ${isMinimised ? 'minimised' : ''}`}>
@@ -291,12 +328,11 @@ const Chat: React.FC<ChatProps> = ({
                   </svg>
                 </div>
               )}
-              {/* TODO: Only show button if all required search data is present */}
-              {isSearchDataUpdated && !isStreaming && (
+              {isSearchDataUpdated && canTriggerSearch() && !isStreaming && (
                 <div className="updateSearchPrompt">
                   <p>Do you want to update the search?</p>
                   <button
-                    onClick={handleUpdateSearchClick}
+                    onClick={triggerSearch}
                     className="button action-button"
                     type="button"
                     aria-label="Update search with new data"

@@ -14,6 +14,15 @@ interface ContentStore {
   removeGeneratedContent: (key: string) => void;
 }
 
+/**
+ * Manages generated content state with status tracking.
+ * Content goes through three states:
+ * - generating: Content generation in progress
+ * - generated: Content successfully created
+ * - error: Generation failed or requirements not met
+ * 
+ * Content is persisted across page refreshes and component remounts.
+ */
 export const useContentStore = create<ContentStore>()(
   persist(
     (set) => ({

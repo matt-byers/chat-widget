@@ -8,6 +8,16 @@ export class ContentGeneratorService {
 
   private readonly matchScoreThreshold = 0.65;
 
+  /**
+   * Analyzes how well an item matches customer preferences.
+   * Returns a score between (0-1) to 4 decimal precision and match status based on the threshold.
+   * 
+   * Scoring process:
+   * 1. Analyzes customer preferences and item details
+   * 2. Generates a score (0-100) based on preference alignment
+   * 3. Normalizes score to 0-1 range
+   * 4. Determines match status using threshold (currently ${this.matchScoreThreshold})
+   */
   private async checkStrongMatch(
     requestData: CustomContentRequest
   ): Promise<{ isMatch: boolean; score: number }> {

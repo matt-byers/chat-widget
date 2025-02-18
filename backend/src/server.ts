@@ -57,7 +57,15 @@ app.use(express.json());
 app.use(limiter);
 app.use('/api/*', sanitizeMessages);
 
-// Handle sending user message and streaming of chat responses from OpenAI
+/**
+ * Handles sending user message and streaming of chat responses from OpenAI
+ * 
+ * Process:
+ * 1. Validates request data
+ * 2. Creates system message with instructions
+ * 3. Streams chat responses from OpenAI
+ * 4. Sends streamed responses to client
+ */
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   const { messages, searchConfig } = req.body;
 
@@ -70,7 +78,7 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
     // Create system message from chatConfig
     const systemMessage = {
       role: 'system',
-      content: `You are a helpful chat assistant helping to extract search information for a customer.Your purpose is to have an easy conversation with a customer to extract specific data to conduct a search, and also to deeply understand specifics of what the customer is looking, their preferences, likes, dislikes, and intentions.
+      content: `You are a helpful chat assistant helping to a customer to find something that matches their preferences. Your purpose is to have an easy conversation with a customer to extract specific data to conduct a search, and also to deeply understand specifics of what the customer is looking; their preferences, likes, dislikes, and intentions.
       This is the context of the business you are assisting: ${chatConfig.businessContext}. 
       This is the context of how users are interacting with you: ${chatConfig.userContext}.
       These are your instructions: ${chatConfig.instructions}. 
@@ -89,6 +97,7 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
       Rules:
       1. Pay attention to the which searchData is required, and if not provided, ask the user for it.
       2. If the user asks to talk to a human, say that they need to do that separately, as this is only an AI.
+      3. Do not talk specifically about search data or updating search, rather just ask the user politely for the information you need.
 
       Formatting:
       - Use markdown for any formatting.
@@ -185,6 +194,17 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Analyzes customer messages to extract and update intention data.
+ * 
+ * Process:
+ * 1. Validates message history
+ * 2. Merges with existing intention data
+ * 3. Updates only when new information provides clearer insight
+ * 4. Preserves all fields unless explicitly updated
+ * 
+ * Returns updated customer intention object with preferences, priorities, and objectives.
+ */
 app.post('/api/customer-intention', async (req: Request, res: Response) => {
   const { messages, currentData } = req.body;
 
@@ -230,6 +250,18 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Moderates user messages for inappropriate content.
+ * 
+ * Uses OpenAI's moderation API to check for:
+ * - Harmful content
+ * - Inappropriate language
+ * - Unsafe requests
+ * 
+ * Returns:
+ * - flagged: boolean indicating if content violates policies
+ * - categories: specific violation categories if flagged
+ */
 app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
   const { content } = req.body;
 
@@ -256,6 +288,15 @@ app.post('/api/moderate-user-message', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Handles content generation requests with preference matching.
+ * 
+ * Process:
+ * 1. Validates request data using Zod schema
+ * 2. Checks for strong preference match if required
+ * 3. Generates personalized content based on preferences
+ * 4. Returns content with relevant metadata
+ */
 app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomContentRequest>, res: Response) => {
   const requestData = req.body;
 
@@ -287,6 +328,17 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
   }
 });
 
+/**
+ * Analyzes customer messages to extract prospect details.
+ * 
+ * Extracts specific information about:
+ * - Product/service type preferences
+ * - Price range considerations
+ * - Required specifications
+ * - Other explicit preferences
+ * 
+ * Only includes information that is explicitly stated or confirmed by the user.
+ */
 app.post('/api/customer-prospect', async (req: Request, res: Response) => {
   const { messages } = req.body;
 

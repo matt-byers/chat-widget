@@ -6,7 +6,7 @@ export interface SearchFieldConfig {
     format?: string;
     example?: any;
 }
-export interface SearchConfig {
+export interface SearchConfigSchema {
     searchData: Record<string, SearchFieldConfig>;
 }
 export interface OpenAIMessage {
@@ -24,7 +24,7 @@ export interface CustomContentRequest {
     textExamples?: string[];
     strongMatchOnly?: boolean;
 }
-export declare function simplifySearchSchema(config: SearchConfig): Record<string, {
+export declare function simplifySearchSchema(config: SearchConfigSchema): Record<string, {
     type: string;
     description: string;
 }>;
@@ -74,7 +74,14 @@ export interface StrongMatchFailureResponse extends BaseContentResponse {
     };
 }
 /**
- * Union of all possible responses
+ * Defines the structure for content generation responses.
+ * Three possible scenarios:
+ * 1. noMatchRequired: Standard generation without match checking
+ * 2. strongMatchSuccess: Match check passed, content generated
+ * 3. strongMatchFailure: Match check failed, no content generated
+ *
+ * Each scenario includes relevant metadata about the generation process.
  */
 export type ContentGenerationResult = StandardGenerationResponse | StrongMatchSuccessResponse | StrongMatchFailureResponse;
+export declare function hasAllRequiredFields(searchData: Record<string, any>, searchConfig: SearchConfigSchema): boolean;
 export {};

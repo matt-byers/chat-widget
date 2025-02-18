@@ -55,22 +55,18 @@ const CustomText: React.FC<CustomTextProps> = ({
   const generateContent = async () => {
     const currentState = useContentStore.getState().generatedContent[contentKey];
     if (currentState?.status === 'generating') {
-      console.log('[CustomText] Generation already in progress for key:', contentKey.slice(0, 50));
       return;
     }
 
-    // Mark as generating in the store.
     setStatusGenerating(contentKey);
-    console.log('[CustomText] Starting content generation for key:', contentKey.slice(0, 50));
 
-    console.log('in generateContent, generatedContent[contentKey].status:', generatedContent[contentKey]?.status);
     if (generatedContent[contentKey]?.status === 'generating') {
       console.log('[CustomText] Content generation already in progress for key:', contentKey.slice(0, 50));
       return;
     }
 
     if (!customerIntention.likes && !customerIntention.priorities) {
-      console.warn('[CustomText] No customer intention - using fallback');
+      console.warn('[CustomText] No customer intention - cancelling generation');
       setStatusError(contentKey);
       return;
     }
