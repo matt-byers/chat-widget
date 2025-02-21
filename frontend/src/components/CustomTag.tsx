@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { useContentStore } from '../store/contentStore';
 import { CustomContentRequest, ContentGenerationResult } from '@chat-widget/utils';
-import './CustomText.scss';
+import './CustomTag.scss';
 
 export interface CustomTagProps {
   itemInformation: Record<string, any>;

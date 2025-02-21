@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import Chat from "./Chat";
 import { useChatStore } from './store/chatStore';
 import { SearchConfigSchema } from '@chat-widget/utils';
-import CustomTag from './components/CustomText';
+import CustomTag from './components/CustomTag';
 
 interface Destination {
   id: number;
