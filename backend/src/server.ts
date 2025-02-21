@@ -311,13 +311,6 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
     return;
   }
 
-  // TODO: move this validate tones to the constructor
-  const validTones = ['positive', 'neutral', 'factual', 'fun'];
-  if (requestData.tone && !validTones.includes(requestData.tone)) {
-    res.status(400).json({ error: 'Invalid tone specified' });
-    return;
-  }
-
   try {
     const contentGenerator = new ContentGeneratorService(openai);
     const result = await contentGenerator.generateContent(requestData);

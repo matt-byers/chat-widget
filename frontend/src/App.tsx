@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import Chat from "./Chat";
 import { useChatStore } from './store/chatStore';
 import { SearchConfigSchema } from '@chat-widget/utils';
-import CustomText from './components/CustomText';
+import CustomTag from './components/CustomText';
 
 interface Destination {
   id: number;
@@ -96,7 +96,7 @@ const dummyDestinations: Destination[] = [
 
 const tagExamples = [
   "Cape town has great beaches!",
-  "Easy palce to fly to from the UK!",
+  "Close to the UK!",
   "Known for great nature and adventure!"
 ];
 
@@ -197,15 +197,14 @@ const App: React.FC = () => {
               <div key={item.id} style={styles.destinationItem}>
                 <h2>{item.name}</h2>
                 <p>{item.longDescription}</p>
-                <CustomText
+                <CustomTag
                   itemInformation={item}
                   name="locationTag"
-                  instructions="create a short tag description that highlights key aspects of this location that match the customer's preferences"
-                  minCharacters={50}
-                  maxCharacters={60}
+                  instructions="create a short tag description highlighting key aspects of this location that match the customer's preferences. Keep it short and clipped. Don't pad it out like a full sentence."
                   textExamples={tagExamples}
-                  // fallbackContent={item.description}
                   strongMatchOnly={true}
+                  backgroundColor="#1a2b3c"
+                  borderColor="#b3d7ff"
                 />
               </div>
             ))}

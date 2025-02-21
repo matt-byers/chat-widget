@@ -2,35 +2,45 @@ import React, { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { useContentStore } from '../store/contentStore';
 import { CustomContentRequest, ContentGenerationResult } from '@chat-widget/utils';
+import './CustomText.scss';
 
-export interface CustomTextProps {
+export interface CustomTagProps {
   itemInformation: Record<string, any>;
   name: string;
   instructions: string;
-  minCharacters: number;
-  maxCharacters: number;
   textExamples?: string[];
-  fallbackContent?: string;
-  tone?: 'positive' | 'neutral' | 'factual' | 'fun';
-  className?: string;
-  style?: React.CSSProperties;
   updateOnIntentionChange?: boolean;
   strongMatchOnly?: boolean;
+  backgroundColor?: string;
+  borderColor?: string;
 }
 
-const CustomText: React.FC<CustomTextProps> = ({
+function isBackgroundColorDark(color: string): boolean {
+  // Remove the leading # if present
+  const hex = color.replace('#', '');
+  
+  // Convert hex to RGB
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  
+  // Calculate relative luminance using sRGB coefficients
+  // Using the formula from WCAG 2.0
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return true if the color is dark (luminance < 0.5)
+  return luminance < 0.5;
+}
+
+const CustomTag: React.FC<CustomTagProps> = ({
   itemInformation,
   name,
   instructions,
-  minCharacters,
-  maxCharacters,
-  tone,
   textExamples = [],
-  fallbackContent,
-  className,
-  style,
   updateOnIntentionChange = true,
   strongMatchOnly = false,
+  backgroundColor = '#f0f0f0',
+  borderColor,
 }) => {
   const { customerIntention } = useChatStore();
   const {
@@ -46,9 +56,6 @@ const CustomText: React.FC<CustomTextProps> = ({
     itemInformation,
     name,
     instructions,
-    minCharacters,
-    maxCharacters,
-    tone,
     textExamples,
   });
 
@@ -77,9 +84,8 @@ const CustomText: React.FC<CustomTextProps> = ({
         customerIntention,
         name,
         instructions,
-        minCharacters,
-        maxCharacters,
-        tone: tone || 'positive',
+        minCharacters: 35,
+        maxCharacters: 40,
         textExamples,
         strongMatchOnly,
       };
@@ -156,45 +162,25 @@ const CustomText: React.FC<CustomTextProps> = ({
   const contentState = generatedContent[contentKey];
 
   return (
-    <div className={className} style={style}>
-      <button onClick={() => removeGeneratedContent(contentKey)}>Remove</button>
-      {contentState?.status === 'generating' && (
-        <div className="ai-sparkle-spinner">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <circle
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-              strokeDasharray="31.4"
-              strokeDashoffset="0">
-              <animateTransform
-                attributeName="transform"
-                type="rotate"
-                from="0 12 12"
-                to="360 12 12"
-                dur="1s"
-                repeatCount="indefinite" />
-            </circle>
-          </svg>
+    <div>
+      <button onClick={() => removeGeneratedContent(contentKey)}>
+        Remove
+      </button>
+      {contentState?.status === 'generated' && 
+       contentState?.content && (
+        <div 
+          className="tag" 
+          style={{
+            backgroundColor,
+            ...(borderColor && { borderColor }),
+            color: isBackgroundColorDark(backgroundColor) ? '#ffffff' : '#000000'
+          }}
+        >
+          <span>✨ {contentState.content}</span>
         </div>
-      )}
-
-      {generatedContent[contentKey]?.status === 'generated' && (
-        <>
-          {generatedContent[contentKey].content}
-        </>
-      )}
-
-      {(!generatedContent[contentKey] || generatedContent[contentKey]?.status === 'error') && fallbackContent && (
-        <>
-          {fallbackContent}
-        </>
       )}
     </div>
   );
 };
 
-export default CustomText; 
+export default CustomTag; 

@@ -20,7 +20,6 @@ export interface CustomContentRequest {
     instructions: string;
     minCharacters: number;
     maxCharacters: number;
-    tone?: 'positive' | 'neutral' | 'factual' | 'fun';
     textExamples?: string[];
     strongMatchOnly?: boolean;
 }

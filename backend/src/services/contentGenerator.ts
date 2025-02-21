@@ -119,8 +119,7 @@ Output the score in the following format: 0.1243, 0.7685.`
         name, 
         instructions, 
         minCharacters, 
-        maxCharacters, 
-        tone = 'positive',
+        maxCharacters,
         textExamples = []
       } = requestData;
 
@@ -134,13 +133,6 @@ Output the score in the following format: 0.1243, 0.7685.`
           customerIntentionUsed: z.array(z.string()).describe('Only list keys from the customerIntention object that contained information explicitly used to generate the content')
         })
       });
-
-      const toneInstruction = {
-        'positive': "Ensure the tone is very upbeat and positive.",
-        'neutral': "Use a neutral and balanced tone.",
-        'factual': "Focus on factual details with an objective tone.",
-        'fun': "Adopt a playful and fun tone."
-      }[tone];
 
       const systemMessage = `You are a professional content generator specializing in creating personalized content for a particular item on an online store or platform.
       Your task is to generate compelling text that communicates how an item's features meet or fulfill the customer's preferences.
@@ -157,7 +149,6 @@ Output the score in the following format: 0.1243, 0.7685.`
       3. Content Parameters:
         - Name: ${name}
         - Target Length: ${minCharacters}-${maxCharacters} characters
-        - Tone: ${tone} - ${toneInstruction}
         - Key Instruction: ${instructions}
         ${textExamples.length > 0 ? `
         - Style Examples:
@@ -174,14 +165,14 @@ Output the score in the following format: 0.1243, 0.7685.`
       2. NEVER invent features - only use provided item information
       3. ALWAYS prioritize aspects that match customer intention and preferences
       4. NEVER use markdown or special formatting
-      5. FOLLOW the tone and style instructions provided
+      5. FOLLOW the instructions provided and pay attention to tone and style
       6. NEVER exactly copy the examples, use them as a guide
       7. AVOID using exact adjectives or phrases from the customer profile data. Instead, use synonymous terms, words, or phrases to avoid repeating the same words throughout the website. For example, if the customer says they like "stylish places", avoid describing things as "stylish" in the generated content, instead use something snyonymous like "good style" or "chic" or something else.
 
       # Process:
       1. Analyze item features and customer preferences
-      2. Identify ways to highlight the way the item's features match the customer's preferences
-      3. Understand the purpose of the content, the tone, and instructions
+      2. Identify ways to highlight how the item's features match the customer's preferences
+      3. Understand the purpose of the content and instructions on how to write it
       4. Create content that sells how the item meets the customer's preferences`;
 
       const userMessage = `
@@ -192,10 +183,10 @@ Output the score in the following format: 0.1243, 0.7685.`
       ${JSON.stringify(filteredIntention, null, 2)}
 
       ## Generation Task:
-      Create personalized copy with the following instructions:
+      Follow these instructions from the user. They outline the writing style, tone, theme, goal and context. Ignore any notes about length or formatting:
       ${instructions}.
 
-      Remember, generated text must be between ${minCharacters} and ${maxCharacters} characters.`
+      Remember, generated text must be between ${minCharacters} and ${maxCharacters} characters. NEVER use Markdown formatting, only plain text.`
 
       console.log('matchScore', matchScore, 'itemInformation.name:', itemInformation.name);
 
