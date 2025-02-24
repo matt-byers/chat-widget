@@ -67,11 +67,6 @@ const CustomTag: React.FC<CustomTagProps> = ({
 
     setStatusGenerating(contentKey);
 
-    if (generatedContent[contentKey]?.status === 'generating') {
-      console.log('[CustomText] Content generation already in progress for key:', contentKey.slice(0, 50));
-      return;
-    }
-
     if (!customerIntention.likes && !customerIntention.priorities) {
       console.warn('[CustomText] No customer intention - cancelling generation');
       setStatusError(contentKey);
@@ -96,8 +91,6 @@ const CustomTag: React.FC<CustomTagProps> = ({
         body: JSON.stringify(requestBody)
       });
 
-      console.log('[CustomText] API response status:', res.status);
-
       if (!res.ok) {
         const errorBody = await res.text();
         console.error('[CustomText] API error response:', errorBody);
@@ -105,27 +98,16 @@ const CustomTag: React.FC<CustomTagProps> = ({
       }
 
       const data: ContentGenerationResult = await res.json();
-
-      switch (data.scenario) {
-        case 'noMatchRequired':
-          console.log('[CustomText] No match required, setting content:', data.content);
-          setContent(contentKey, data.content);
-          break;
-
-        case 'strongMatchSuccess':
-          console.log('[CustomText] Strong match success, setting content:', data.content);
-          setContent(contentKey, data.content);
-          break;
-
-        case 'strongMatchFailure':
-          console.log('[CustomText] Strong match failure, setting error:', contentKey);
-          setStatusError(contentKey);
-          break;
-
-        default:
-          const _exhaustiveCheck: never = data;
-          throw new Error(`Unhandled response scenario: ${(_exhaustiveCheck as any).scenario}`);
+      
+      if (data.scenario === 'strongMatchFailure') {
+        console.log('[CustomText] Strong match failure, setting error:', contentKey);
+        setStatusError(contentKey);
+        return;
       }
+
+      console.log(`[CustomText] ${data.scenario}, setting content:`, data.content);
+      setContent(contentKey, data.content);
+
     } catch (error) {
       console.error("[CustomText] Content generation failed:", error);
       setStatusError(contentKey);

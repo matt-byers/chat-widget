@@ -313,7 +313,9 @@ app.post('/api/generate-custom-content', async (req: Request<{}, {}, CustomConte
 
   try {
     const contentGenerator = new ContentGeneratorService(openai);
-    const result = await contentGenerator.generateContent(requestData);
+    const result = requestData.strongMatchOnly 
+      ? await contentGenerator.generateStrongMatchContent(requestData)
+      : await contentGenerator.generateContent(requestData);
     res.json(result);
   } catch (error) {
     console.error('[API] Content generation error:', error);
