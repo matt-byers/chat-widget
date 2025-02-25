@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { useContentStore } from '../store/contentStore';
 import { CustomContentRequest, ContentGenerationResult } from '@chat-widget/utils';
-import './CustomTag.scss';
+import '../styles/CustomTag.scss';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export interface CustomTagProps {
   itemInformation: Record<string, any>;
@@ -37,7 +38,7 @@ const CustomTag: React.FC<CustomTagProps> = ({
   name,
   instructions,
   textExamples = [],
-  updateOnIntentionChange = true,
+  updateOnIntentionChange = false,
   strongMatchOnly = false,
   backgroundColor = '#f0f0f0',
   borderColor,
@@ -55,8 +56,7 @@ const CustomTag: React.FC<CustomTagProps> = ({
   const contentKey = JSON.stringify({
     itemInformation,
     name,
-    instructions,
-    textExamples,
+    instructions
   });
 
   const generateContent = async () => {
@@ -141,28 +141,30 @@ const CustomTag: React.FC<CustomTagProps> = ({
     }
   }, []);
 
-  const contentState = generatedContent[contentKey];
+  try {
+    const contentState = generatedContent[contentKey];
 
-  return (
-    <div>
-      <button onClick={() => removeGeneratedContent(contentKey)}>
-        Remove
-      </button>
-      {contentState?.status === 'generated' && 
-       contentState?.content && (
-        <div 
-          className="tag" 
-          style={{
-            backgroundColor,
-            ...(borderColor && { borderColor }),
-            color: isBackgroundColorDark(backgroundColor) ? '#ffffff' : '#000000'
-          }}
-        >
-          <span>✨ {contentState.content}</span>
-        </div>
-      )}
-    </div>
-  );
+    return (
+      <ErrorBoundary>
+        {contentState?.status === 'generated' && contentState?.content ? (
+          <div 
+            data-testid="custom-tag"
+            className="tag"
+            style={{
+              backgroundColor,
+              ...(borderColor && { borderColor }),
+              color: isBackgroundColorDark(backgroundColor) ? '#ffffff' : '#000000'
+            }}
+          >
+            <span>✨ {contentState.content}</span>
+          </div>
+        ) : null}
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    console.error('[CustomTag] Render error:', error);
+    return null;
+  }
 };
 
 export default CustomTag; 

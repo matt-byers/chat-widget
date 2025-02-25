@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
-import Chat from "./Chat";
 import { useChatStore } from './store/chatStore';
 import { SearchConfigSchema } from '@chat-widget/utils';
+import Chat from "./components/Chat";
 import CustomTag from './components/CustomTag';
 
 interface Destination {
