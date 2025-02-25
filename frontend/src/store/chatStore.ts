@@ -35,7 +35,7 @@ export const useChatStore = create<ChatState>()(
       
       updateSearchData: (newData) => {
         const updatedData = { ...get().searchData };
-        
+        console.log('newData', newData);
         for (const key in newData) {
           if (newData[key] !== undefined && newData[key] !== null) {
             updatedData[key] = newData[key];
@@ -43,17 +43,21 @@ export const useChatStore = create<ChatState>()(
         }
         
         set({ searchData: updatedData });
-        
+        console.log('updatedData', updatedData);
         const { searchConfig } = get();
         if (searchConfig && hasAllRequiredFields(updatedData, searchConfig)) {
+          console.log('hasAllRequiredFields', hasAllRequiredFields(updatedData, searchConfig));
           const { requireManualSearch } = get();
           if (!requireManualSearch) {
+            console.log('requireManualSearch is false');
             // Triggers search in customer's app assuming they're listening to requiredSearchData changes
             set({ requiredSearchData: updatedData });
           } else {
+            console.log('requireManualSearch is true, setting isSearchDataUpdated to true to show button');
             set({ isSearchDataUpdated: true });
           }
         }
+        console.log('requiredSearchData', get().requiredSearchData);
       },
       
       updateCustomerIntention: (newData) => {

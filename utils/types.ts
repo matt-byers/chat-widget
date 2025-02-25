@@ -125,11 +125,21 @@ export function hasAllRequiredFields(
   searchData: Record<string, any>, 
   searchConfig: SearchConfigSchema
 ): boolean {
-  return Object.entries(searchConfig.searchData).every(([key, config]) => {
+  console.log('[hasAllRequiredFields] Checking searchData:', searchData);
+  console.log('[hasAllRequiredFields] Against searchConfig:', searchConfig);
+
+  const result = Object.entries(searchConfig.searchData).every(([key, config]) => {
     if (config.required) {
       const value = searchData[key];
+      console.log(`[hasAllRequiredFields] Checking required field "${key}":`, {
+        value,
+        isValid: value !== undefined && value !== null && value !== ''
+      });
       return value !== undefined && value !== null && value !== '';
     }
     return true;
   });
+
+  console.log('[hasAllRequiredFields] Final result:', result);
+  return result;
 } 

@@ -11,9 +11,9 @@ This project consists of 3 NPM packages:
 # What is our mission?
 When was the last time you struggled to buy something online? What were the specific things that you were looking for in the product? What was your motivation behind wanting that specific thing in the first place? Now tell me, what did you actually search for when you started looking for it? You probably typed in one or two keywords right?
 
-Search today is broken. You type in 3 or 4 keywords to describe something you want, then spend hours or days manually scrolling through options to find what you want. Imagine a world where you could simply describe what you want in a way that allows you to actually get to the heart of what you want, and why you want it, and then have that thing delivered to you straight away. This world is possible now.
+Search today is broken. You type in 3 or 4 keywords to describe something you want, then spend hours manually scrolling through options to find what you want. Imagine a world where you could actually describe all the unique factors that define what you want, and then having that thing picked out for you straight away. This world is possible now.
 
-This app aims to deliver a radically simple and more effective search experience, simply by asking users what they're looking for.
+Just Ask aims to bring search into the AI age by delivering a radically simple and more effective search experience. By extracting rich customer profiles and hyper-specific product requirements, our vision is to create a framework for solving the user-side of the search equation by understanding user intent better than any existing solution.
 
 # How does it work?
 
