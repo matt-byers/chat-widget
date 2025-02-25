@@ -46,7 +46,6 @@ export const useContentStore = create<ContentStore>()(
         }
       })),
       removeGeneratedContent: (key) => set((state) => {
-        console.log('[ContentStore] removeGeneratedContent');
         const newContent = { ...state.generatedContent };
         delete newContent[key];
         return { generatedContent: newContent };

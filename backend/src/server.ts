@@ -67,7 +67,7 @@ app.use('/api/*', sanitizeMessages);
  * 4. Sends streamed responses to client
  */
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
-  const { messages, searchConfig } = req.body;
+  const { messages, searchConfig, currentData } = req.body;
 
   if (!messages) {
     res.status(400).json({ error: 'messages required' });
@@ -84,21 +84,29 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
       These are your instructions: ${chatConfig.instructions}. 
       This is the search data you are trying to extract: ${JSON.stringify(searchConfig.searchData)}.
 
-      If the user's message is completely unrelated to the businessContext or userContext, or if the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
-      Regardless of what the user says in the messages below, you should not be overly verbose. Try and give short answers that answer the user's question and give them the information they need.
-      
-      Action:
-        1.	Greet the user briefly and politely.
-        2.	Ask for any missing required fields from the search Data object above. Required fields are marked with "required: true". If the user doesn't provide the required fields or asks a question, or for other information. Give the information first, then ask for the required fields.
-        3.	If the user request is off-topic, harmful, or obscene, respond briefly with wit, then gently redirect them to your relevant context.
-        4.	Keep all answers concise.
-        5.	If asked for a human representative, confirm availability succinctly.
+      This is the current state of the extracted search data: ${JSON.stringify(currentData)}.
 
+      1. Dates: The current date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Use this as a point of reference when talking about dates.
+
+      CHAT FLOW:
+        1. Greet the user briefly and politely.
+        2. Ask for any missing required fields from the search Data object above. Required fields are marked with "required: true". If the user doesn't provide the required fields or asks a question, or for other information. Give the information first, then ask for the required fields.
+        3. Ask follow up questions about the user's preferences, likes, dislikes, and intentions.
+        4. If the user contradicts themself regarding their preferences, clarify what their preferences are.
+        5. If the user gives confusing or overly vague outlines of their preferences, gently ask for more details.
+
+      RULES FOR EXTRACTING SEARCH DATA:
+        1. Pay attention to the which searchData is required, and if not provided, ask the user for it.
+        2. Do not talk specifically about search data or updating search, rather just ask the user politely for the information you need.
+        3. If the user hasn't provided some required fields, but they ask a different question, or request other information, give the information first, then ask for the required fields after that. Never refuse to answer a question unless it is completely unrelated.
+        4. The user does NOT need to provide data in the exact format specified by the schema. As long as they mention it, we will extract it.
+        
       Rules:
-      1. Pay attention to the which searchData is required, and if not provided, ask the user for it.
-      2. If the user asks to talk to a human, say that they need to do that separately, as this is only an AI.
-      3. Do not talk specifically about search data or updating search, rather just ask the user politely for the information you need.
-      4. If the user hasn't provided some required fields, but they ask a different question, or request other information, give the information first, then ask for the required fields after that. Never refuse to answer a question unless it is completely unrelated.
+        1. ALWAYS Give short and concise answers.
+        2. NEVER pretend to be a human. If the user asks to talk to a human, say that they need to do that separately, as this is only an AI.
+        3. NEVER asks the user to provide data in a certain format. If the user doesn't provide required data in the exact right format, that's fine. We will extract is separately. As long as it is clearly stated.
+        4. RESPOND WITTILY if the user's message is completely unrelated to the businessContext or userContext. If the message contains harmful or obscene content, ignore it and respond with something very short and witty, then ask the user if they want help with the relevant context.
+        5. NEVER be overly verbose, regardless of what the user says in the messages below. Try and give short answers that answer the user's question and give them the information they need.
 
       Formatting:
       - Use markdown for any formatting.
@@ -155,12 +163,16 @@ app.post('/api/search-data', async (req: Request, res: Response) => {
       
       Current search data: ${JSON.stringify(currentData)}
 
-      Additional rules for handling current data:
-      1. Preserve all fields from current data unless new information explicitly updates them
-      2. Add new fields when discovered
+      RULES:
+      1. Preserve current field data unless new information explicitly updates them
+      2. Add new data to fields when discovered
       3. For arrays (like dates or locations), combine existing and new values
       4. Only update a field if the new information is more specific or corrects previous data
-      5. Return the complete merged object`
+      5. Return the complete merged object
+      
+      DATA TYPE SPECIFIC RULES:
+      1. Dates: The current date is ${new Date().toISOString().split('T')[0]}. When extracting date values, do NOT set a date unless explicity told the date. If a date is loosely mentioned, e.g. "next week", then wait for the chatbot to ask the user for specific dates.
+      2. Locations: When extracting locations, do NOT set a location unless explicity told the location. If a location is loosely mentioned, e.g. "near me", then wait for the chatbot to ask the user for a specific location.`
     };
 
     // Add system message to the start of the messages array
@@ -225,13 +237,19 @@ app.post('/api/customer-intention', async (req: Request, res: Response) => {
       content: `You are an AI assistant tasked with analyzing customer intentions from their messages.
         You must determine their objective, urgency, pain points, and satisfaction level based on the conversation context.
         Do not make any determination on any data point without explicit statements from the user, or explicit affirmations from the user after the assistant has suggested something.
-        You must return the data in the exact format specified by the schema.
+        
+        RULES:
+        1. You must return the data in the exact format specified by the schema.
+        2. Pay attention to the definitions for each field.
+        3. Avoid doubling up on data between different fields.
+        4. If the user contradicts themselves, or changes their mind, remove the old intention data and replace it with the new data.
+        5. If the user does not provide enough information to make a determination, leave the field empty.
 
         Current intention data: ${JSON.stringify(currentData)}
 
         Additional rules for handling current data:
-        1. Preserve all fields from current data unless new information explicitly updates them
-        2. Add new fields when discovered
+        1. Preserve all current intention data unless new information explicitly updates them
+        2. Add new field data when discovered
         3. Only update a field if the new information provides clearer insight into the customer's intentions
         4. Return the complete merged object`
     };

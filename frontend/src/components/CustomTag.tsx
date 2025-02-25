@@ -68,7 +68,6 @@ const CustomTag: React.FC<CustomTagProps> = ({
     setStatusGenerating(contentKey);
 
     if (!customerIntention.likes && !customerIntention.priorities) {
-      console.warn('[CustomText] No customer intention - cancelling generation');
       setStatusError(contentKey);
       return;
     }
@@ -100,16 +99,13 @@ const CustomTag: React.FC<CustomTagProps> = ({
       const data: ContentGenerationResult = await res.json();
       
       if (data.scenario === 'strongMatchFailure') {
-        console.log('[CustomText] Strong match failure, setting error:', contentKey);
         setStatusError(contentKey);
         return;
       }
 
-      console.log(`[CustomText] ${data.scenario}, setting content:`, data.content);
       setContent(contentKey, data.content);
 
     } catch (error) {
-      console.error("[CustomText] Content generation failed:", error);
       setStatusError(contentKey);
     }
   };
@@ -124,7 +120,6 @@ const CustomTag: React.FC<CustomTagProps> = ({
       });
 
       if (prevIntentRef.current && prevIntentRef.current !== currentIntent) {
-        console.log('[CustomText] Intention changed, regenerating content');
         generateContent();
       }
       prevIntentRef.current = currentIntent;
@@ -133,10 +128,7 @@ const CustomTag: React.FC<CustomTagProps> = ({
 
   // Generate content on component mount if none in store
   useEffect(() => {
-    console.log('[CustomText] Initial load check');
-    console.log('generatedContent[contentKey]:', generatedContent[contentKey]);
     if (!generatedContent[contentKey] || generatedContent[contentKey].status === 'error') {
-      console.log('[CustomText] No content found, generating');
       generateContent();
     }
   }, []);

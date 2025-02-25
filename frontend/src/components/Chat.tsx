@@ -57,11 +57,11 @@ const Chat: React.FC<ChatProps> = ({
     const handleMessage = async () => {
       setIsStreaming(true);
       chatControllerRef.current = new AbortController();
-      const lastMessage = messages[messages.length - 1].content;
 
-      await moderateUserMessage(lastMessage);
       extractSearchData();
       extractCustomerIntention();
+
+      const { searchData: currentSearchData } = useChatStore.getState();
 
       addMessage({ role: 'assistant', content: '' });
 
@@ -71,7 +71,8 @@ const Chat: React.FC<ChatProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages,
-            searchConfig
+            searchConfig,
+            currentData: currentSearchData
           }),
           signal: chatControllerRef.current.signal,
         });
@@ -332,7 +333,7 @@ const Chat: React.FC<ChatProps> = ({
                       </svg>
                     </div>
                   )}
-                  {isSearchDataUpdated && canTriggerSearch() && !isStreaming && (
+                  {requireManualSearch && isSearchDataUpdated && canTriggerSearch() && !isStreaming && (
                     <div className="updateSearchPrompt">
                       <p>Do you want to update the search?</p>
                       <button

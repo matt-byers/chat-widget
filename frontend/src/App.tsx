@@ -102,17 +102,17 @@ const tagExamples = [
 
 const App: React.FC = () => {
   const { 
-    searchData, 
-    customerIntention, 
-    syncSearchState,
-    setSearchTrigger
+    requiredSearchData, // Extracted search data including all required fields. Updated with each message.
+    customerIntention, // Customer intention data updated with each message.
+    syncSearchState, // Syncs the search data to the store.
+    searchData // Extracted search data not necessarily containing all required fields. Updated with each message.
   } = useChatStore();
   
   useEffect(() => {
-    if (Object.keys(searchData).length > 0) {
+    if (Object.keys(requiredSearchData).length > 0) {
       // Handle search data changes
     }
-  }, [searchData]);
+  }, [requiredSearchData]);
 
   useEffect(() => {
     if (Object.keys(customerIntention).length > 0) {
@@ -120,9 +120,14 @@ const App: React.FC = () => {
     }
   }, [customerIntention]);
 
-  const handleUpdateSearchClick = () => {
-    console.log('Updating search with data:', searchData);
-    // Here you would typically trigger a search with the new data
+  // Test search handler
+  const handleUserManualSearch = () => {
+    const testSearchData = {
+      location: 'Paris, France',
+      startDate: '2024-06-01',
+      endDate: '2024-06-07'
+    };
+    syncSearchState(testSearchData);
   };
 
   // Test search config
@@ -147,29 +152,15 @@ const App: React.FC = () => {
         required: true,
         format: 'YYYY-MM-DD',
         example: '2024-06-07'
+      },
+      numberOfGuests: {
+        type: 'number',
+        description: 'Number of guests. Must be greater than 0, but less than 15',
+        required: true,
+        example: 2
       }
     }
   };
-
-  // Test search handler
-  const handleTestSearch = () => {
-    setTimeout(() => {
-      const testSearchData = {
-        location: 'Paris, France',
-        startDate: '2024-06-01',
-        endDate: '2024-06-07'
-      };
-      
-      syncSearchState(testSearchData);
-    }, 1500);
-  };
-
-  // Set up search trigger once
-  useEffect(() => {
-    setSearchTrigger(() => {
-      handleUpdateSearchClick();
-    });
-  }, []);
 
   return (
     <div style={styles.wrapper}>
@@ -184,9 +175,11 @@ const App: React.FC = () => {
           <pre>{JSON.stringify(searchData, null, 2)}</pre>
           <h3>Customer Intention:</h3>
           <pre>{JSON.stringify(customerIntention, null, 2)}</pre>
+          <h3>Required Search Data:</h3>
+          <pre>{JSON.stringify(requiredSearchData, null, 2)}</pre>
         </div>
         <div>
-          <button onClick={handleTestSearch}>
+          <button onClick={handleUserManualSearch}>
             Test Search: Paris
           </button>
         </div>
@@ -213,7 +206,7 @@ const App: React.FC = () => {
       </main>
       <Chat 
         searchConfig={testSearchConfig}
-        requireManualSearch={true}
+        requireManualSearch={false}
       />
       <footer style={styles.footer}>
         <p>Footer</p>

@@ -4,12 +4,12 @@ import { OpenAIMessage, SearchConfigSchema, hasAllRequiredFields } from '@chat-w
 
 interface ChatState {
   searchData: Record<string, any>;
+  requiredSearchData: Record<string, any>;
   customerIntention: Record<string, any>;
   messages: OpenAIMessage[];
   isSearchDataUpdated: boolean;
   searchConfig: SearchConfigSchema | null;
   requireManualSearch: boolean;
-  onSearchTrigger?: () => void;
   updateSearchData: (newData: Record<string, any>) => void;
   updateCustomerIntention: (newData: Record<string, any>) => void;
   addMessage: (message: { role: 'user' | 'assistant'; content: string }) => void;
@@ -17,7 +17,6 @@ interface ChatState {
   syncSearchState: (searchData: Record<string, any>) => void;
   setSearchDataUpdated: (updated: boolean) => void;
   setSearchConfig: (config: SearchConfigSchema) => void;
-  setSearchTrigger: (callback: () => void) => void;
   triggerSearch: () => void;
   canTriggerSearch: () => boolean;
   resetChatState: () => void;
@@ -28,11 +27,11 @@ export const useChatStore = create<ChatState>()(
     (set, get) => ({
       searchData: {},
       customerIntention: {},
+      requiredSearchData: {},
       messages: [],
       isSearchDataUpdated: false,
       searchConfig: null,
       requireManualSearch: false,
-      onSearchTrigger: undefined,
       
       updateSearchData: (newData) => {
         const updatedData = { ...get().searchData };
@@ -47,9 +46,10 @@ export const useChatStore = create<ChatState>()(
         
         const { searchConfig } = get();
         if (searchConfig && hasAllRequiredFields(updatedData, searchConfig)) {
-          const { requireManualSearch, onSearchTrigger } = get();
-          if (!requireManualSearch && onSearchTrigger) {
-            onSearchTrigger();
+          const { requireManualSearch } = get();
+          if (!requireManualSearch) {
+            // Triggers search in customer's app assuming they're listening to requiredSearchData changes
+            set({ requiredSearchData: updatedData });
           } else {
             set({ isSearchDataUpdated: true });
           }
@@ -103,16 +103,11 @@ export const useChatStore = create<ChatState>()(
         set({ searchConfig: config });
       },
 
-      setSearchTrigger: (callback) => {
-        set({ onSearchTrigger: callback });
-      },
-
       triggerSearch: () => {
-        const { onSearchTrigger } = get();
-        if (onSearchTrigger) {
-          onSearchTrigger();
-          set({ isSearchDataUpdated: false });
-        }
+        const { searchData } = get();
+        // Triggers search in customer's app assuming they're listening to requiredSearchData changes
+        set({ requiredSearchData: searchData });
+        set({ isSearchDataUpdated: false });
       },
 
       canTriggerSearch: () => {
@@ -122,18 +117,19 @@ export const useChatStore = create<ChatState>()(
 
       resetChatState: () => set({ 
         searchData: {}, 
+        requiredSearchData: {},
         customerIntention: {}, 
         messages: [], 
         isSearchDataUpdated: false,
         searchConfig: null,
-        requireManualSearch: false,
-        onSearchTrigger: undefined
+        requireManualSearch: false
       }),
     }),
     {
       name: 'chat-storage',
       partialize: (state) => ({ 
         searchData: state.searchData,
+        requiredSearchData: state.requiredSearchData,
         customerIntention: state.customerIntention,
         messages: state.messages,
         isSearchDataUpdated: state.isSearchDataUpdated,
