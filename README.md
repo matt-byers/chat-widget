@@ -1,7 +1,7 @@
 # Just Ask ✨
-> An AI-first chatbot for creating personalised, high-converting search experiences in web apps.
+Just Ask is an AI-first component library for building chat-based, personalised search and refinement user experiences for web apps. It aims to rethink the way we build search experiences by extracting rich customer profiles and hyper-specific product requirements, and using them to create a more effective search experience.
 
-> ⚠️ **Note:** This project is still under development, packages are not yet published to NPM.
+> ⚠️ **Note:** This project is still under development. NPM packages are not yet published, and components are being added progressively.
 
 This project consists of 3 NPM packages:
 - Frontend React components (@chat-widget/frontend)
@@ -43,6 +43,10 @@ ALLOWED_ORIGINS=http://localhost:3000
 
 ### Chat
 The main chat widget component that provides an AI-powered chat interface with automatic search data extraction.
+
+#### Screenshot
+![Chat Widget Screenshot](./screenshots/chat_screenshot.png)
+*The screenshot above shows chat widget component with the search data and customer intention profile JSON objects that have been extracted from the conversation.*
 
 #### Props
 ```typescript
@@ -134,6 +138,11 @@ const App: React.FC = () => {
 ### CustomTag
 A component that generates and displays AI-optimized content tags based on customer preferences and item data.
 
+#### Screenshot
+![Custom Tag Screenshot](./screenshots/custom_tag_screenshot.png)
+*The screenshot above shows a custom tag component looped over holiday destinations listings with the `strongMatchOnly` prop set to `true`. This is why Maldives has a custom tag, while Paris does not, because the user's preferences are more strongly aligned with Maldives.*
+
+
 #### Props
 ```typescript
 interface CustomTagProps {
@@ -199,3 +208,4 @@ function App() {
   );
 }
 ```
+
