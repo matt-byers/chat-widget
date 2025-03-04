@@ -10,6 +10,7 @@ interface ChatState {
   isSearchDataUpdated: boolean;
   searchConfig: SearchConfigSchema | null;
   requireManualSearch: boolean;
+  isMinimised: boolean;
   updateSearchData: (newData: Record<string, any>) => void;
   updateCustomerIntention: (newData: Record<string, any>) => void;
   addMessage: (message: { role: 'user' | 'assistant'; content: string }) => void;
@@ -19,6 +20,8 @@ interface ChatState {
   setSearchConfig: (config: SearchConfigSchema) => void;
   triggerSearch: () => void;
   canTriggerSearch: () => boolean;
+  toggleMinimised: () => void;
+  setMinimised: (minimised: boolean) => void;
   resetChatState: () => void;
 }
 
@@ -32,6 +35,7 @@ export const useChatStore = create<ChatState>()(
       isSearchDataUpdated: false,
       searchConfig: null,
       requireManualSearch: false,
+      isMinimised: false,
       
       updateSearchData: (newData) => {
         const updatedData = { ...get().searchData };
@@ -119,6 +123,14 @@ export const useChatStore = create<ChatState>()(
         return searchConfig ? hasAllRequiredFields(searchData, searchConfig) : false;
       },
 
+      toggleMinimised: () => {
+        set((state) => ({ isMinimised: !state.isMinimised }));
+      },
+
+      setMinimised: (minimised) => {
+        set({ isMinimised: minimised });
+      },
+
       resetChatState: () => set({ 
         searchData: {}, 
         requiredSearchData: {},
@@ -126,7 +138,8 @@ export const useChatStore = create<ChatState>()(
         messages: [], 
         isSearchDataUpdated: false,
         searchConfig: null,
-        requireManualSearch: false
+        requireManualSearch: false,
+        isMinimised: false,
       }),
     }),
     {
@@ -138,7 +151,8 @@ export const useChatStore = create<ChatState>()(
         messages: state.messages,
         isSearchDataUpdated: state.isSearchDataUpdated,
         searchConfig: state.searchConfig,
-        requireManualSearch: state.requireManualSearch
+        requireManualSearch: state.requireManualSearch,
+        isMinimised: state.isMinimised
       })
     }
   )
