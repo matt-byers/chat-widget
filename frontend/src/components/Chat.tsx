@@ -25,7 +25,10 @@ const Chat: React.FC<ChatProps> = ({
     setSearchConfig,
     canTriggerSearch,
     triggerSearch,
-    resetChatState
+    resetChatState,
+    isMinimised,
+    toggleMinimised,
+    setMinimised
   } = useChatStore();
 
   // Chat content
@@ -36,7 +39,6 @@ const Chat: React.FC<ChatProps> = ({
   const [isExtractingSearch, setIsExtractingSearch] = useState(false);
   const [isExtractingIntention, setIsExtractingIntention] = useState(false);
   const [isTransparent, setIsTransparent] = useState(false);
-  const [isMinimised, setIsMinimised] = useState(false);
 
   // Refs
   const chatControllerRef = useRef<AbortController | null>(null);
@@ -241,7 +243,7 @@ const Chat: React.FC<ChatProps> = ({
   }, [messages]);
 
   const handleMinimise = () => {
-    setIsMinimised(prev => !prev);
+    toggleMinimised();
   };
 
   // Abort streams when the component unmounts to prevent memory leaks
@@ -269,7 +271,7 @@ const Chat: React.FC<ChatProps> = ({
               className="minimisedContainer"
               role="banner"
               aria-label="minimised chat"
-              onClick={() => setIsMinimised(false)}
+              onClick={() => setMinimised(false)}
             >
               <div className="minimisedMessage" tabIndex={0}>
                 {messages.length > 0 && messages[messages.length - 1].role === 'assistant' ?
